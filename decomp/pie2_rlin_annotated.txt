@@ -1,0 +1,943 @@
+0065afc0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]>:
+/* [line 2588] */ 65afc0:	55                   	push   ebp
+                 65afc1:	57                   	push   edi
+                 65afc2:	89 c5                	mov    ebp,eax
+                 65afc4:	56                   	push   esi
+                 65afc5:	53                   	push   ebx
+                 65afc6:	e8 e5 7d e6 ff       	call   4c2db0 <__x86.get_pc_thunk.bx>
+                 65afcb:	81 c3 11 b2 90 01    	add    ebx,0x190b211
+                 65afd1:	81 ec ec 00 00 00    	sub    esp,0xec
+/* [line 2588] */ 65afd7:	8b 84 24 00 01 00 00 	mov    eax,DWORD PTR [esp+0x100]
+                 65afde:	89 54 24 0c          	mov    DWORD PTR [esp+0xc],edx
+                 65afe2:	8d b4 24 d4 00 00 00 	lea    esi,[esp+0xd4]
+                 65afe9:	89 5c 24 28          	mov    DWORD PTR [esp+0x28],ebx
+                 65afed:	89 4c 24 70          	mov    DWORD PTR [esp+0x70],ecx
+                 65aff1:	89 44 24 74          	mov    DWORD PTR [esp+0x74],eax
+                 65aff5:	65 a1 14 00 00 00    	mov    eax,gs:0x14
+                 65affb:	89 84 24 dc 00 00 00 	mov    DWORD PTR [esp+0xdc],eax
+                 65b002:	31 c0                	xor    eax,eax
+/* [line  381] */ 65b004:	e8 77 b8 ef ff       	call   556880 <user_time()>
+/* [line  358] */ 65b009:	8b 95 94 00 00 00    	mov    edx,DWORD PTR [ebp+0x94]
+                 65b00f:	89 c7                	mov    edi,eax
+                 65b011:	85 d2                	test   edx,edx
+                 65b013:	75 3d                	jne    65b052 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x92>
+                 65b015:	eb 7c                	jmp    65b093 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xd3>
+                 65b017:	89 f6                	mov    esi,esi
+                 65b019:	8d bc 27 00 00 00 00 	lea    edi,[edi+eiz*1+0x0]
+/* [line  389] */ 65b020:	8b 5c 24 28          	mov    ebx,DWORD PTR [esp+0x28]
+                 65b024:	e8 57 b8 ef ff       	call   556880 <user_time()>
+                 65b029:	29 f8                	sub    eax,edi
+                 65b02b:	83 f8 3b             	cmp    eax,0x3b
+                 65b02e:	0f 8f fb 04 00 00    	jg     65b52f <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x56f>
+/* [line  392] */ 65b034:	83 ec 0c             	sub    esp,0xc
+                 65b037:	68 f4 01 00 00       	push   0x1f4
+                 65b03c:	8b 5c 24 38          	mov    ebx,DWORD PTR [esp+0x38]
+                 65b040:	e8 cb ba ef ff       	call   556b10 <user_wait(int)>
+/* [line  358] */ 65b045:	8b 9d 94 00 00 00    	mov    ebx,DWORD PTR [ebp+0x94]
+                 65b04b:	83 c4 10             	add    esp,0x10
+                 65b04e:	85 db                	test   ebx,ebx
+                 65b050:	74 41                	je     65b093 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xd3>
+/* [line  363] */ 65b052:	31 c0                	xor    eax,eax
+                 65b054:	c7 84 24 d4 00 00 00 	mov    DWORD PTR [esp+0xd4],0x0
+                 65b05b:	00 00 00 00
+/* [line  372] */ 65b05f:	83 ec 0c             	sub    esp,0xc
+/* [line  363] */ 65b062:	66 89 84 24 e4 00 00 	mov    WORD PTR [esp+0xe4],ax
+                 65b069:	00
+/* [line  370] */ 65b06a:	c7 85 94 00 00 00 00 	mov    DWORD PTR [ebp+0x94],0x0
+                 65b071:	00 00 00
+/* [line  372] */ 65b074:	31 c9                	xor    ecx,ecx
+                 65b076:	6a 00                	push   0x0
+                 65b078:	89 f2                	mov    edx,esi
+                 65b07a:	89 e8                	mov    eax,ebp
+                 65b07c:	e8 bf f6 ff ff       	call   65a740 <pie2_scsi(PIE2_T*, unsigned char*, unsigned char*, int) [clone .constprop.15]>
+/* [line  386] */ 65b081:	83 c4 10             	add    esp,0x10
+                 65b084:	3d 04 00 00 80       	cmp    eax,0x80000004
+                 65b089:	74 95                	je     65b020 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x60>
+/* [line 2608] */ 65b08b:	85 c0                	test   eax,eax
+                 65b08d:	0f 85 9c 04 00 00    	jne    65b52f <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x56f>
+                 65b093:	8d bd 0c 01 0a 00    	lea    edi,[ebp+0xa010c]
+/* [line 2615] */ 65b099:	8d 85 08 01 0a 00    	lea    eax,[ebp+0xa0108]
+                 65b09f:	c7 85 08 01 0a 00 00 	mov    DWORD PTR [ebp+0xa0108],0x0
+                 65b0a6:	00 00 00
+                 65b0a9:	c7 85 84 01 0a 00 00 	mov    DWORD PTR [ebp+0xa0184],0x0
+                 65b0b0:	00 00 00
+/* [line 2613] */ 65b0b3:	c7 85 f8 00 0a 00 00 	mov    DWORD PTR [ebp+0xa00f8],0x0
+                 65b0ba:	00 00 00
+                 65b0bd:	83 e7 fc             	and    edi,0xfffffffc
+                 65b0c0:	c7 85 fc 00 0a 00 00 	mov    DWORD PTR [ebp+0xa00fc],0x0
+                 65b0c7:	00 00 00
+                 65b0ca:	c7 85 00 01 0a 00 00 	mov    DWORD PTR [ebp+0xa0100],0x0
+                 65b0d1:	00 00 00
+                 65b0d4:	29 f8                	sub    eax,edi
+                 65b0d6:	c7 85 04 01 0a 00 00 	mov    DWORD PTR [ebp+0xa0104],0x0
+                 65b0dd:	00 00 00
+                 65b0e0:	8d 88 80 00 00 00    	lea    ecx,[eax+0x80]
+                 65b0e6:	31 c0                	xor    eax,eax
+                 65b0e8:	c1 e9 02             	shr    ecx,0x2
+                 65b0eb:	f3 ab                	rep stos DWORD PTR es:[edi],eax
+/* [line 2623] */ 65b0ed:	8b 84 24 04 01 00 00 	mov    eax,DWORD PTR [esp+0x104]
+                 65b0f4:	85 c0                	test   eax,eax
+                 65b0f6:	b8 03 00 00 00       	mov    eax,0x3
+                 65b0fb:	0f 44 84 24 08 01 00 	cmove  eax,DWORD PTR [esp+0x108]
+                 65b102:	00
+                 65b103:	89 44 24 24          	mov    DWORD PTR [esp+0x24],eax
+                 65b107:	8b 84 24 20 01 00 00 	mov    eax,DWORD PTR [esp+0x120]
+                 65b10e:	01 c0                	add    eax,eax
+                 65b110:	83 bc 24 2c 01 00 00 	cmp    DWORD PTR [esp+0x12c],0x8
+                 65b117:	08
+                 65b118:	0f 4e 84 24 20 01 00 	cmovle eax,DWORD PTR [esp+0x120]
+                 65b11f:	00
+/* [line 2632] */ 65b120:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x1
+                 65b127:	01
+                 65b128:	89 44 24 3c          	mov    DWORD PTR [esp+0x3c],eax
+                 65b12c:	0f 8e 55 0c 00 00    	jle    65bd87 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xdc7>
+/* [line 2644] */ 65b132:	8b 44 24 24          	mov    eax,DWORD PTR [esp+0x24]
+/* [line 2633] */ 65b136:	83 44 24 3c 02       	add    DWORD PTR [esp+0x3c],0x2
+/* [line 2636] */ 65b13b:	c7 44 24 14 01 00 00 	mov    DWORD PTR [esp+0x14],0x1
+                 65b142:	00
+/* [line 2644] */ 65b143:	8d 14 40             	lea    edx,[eax+eax*2]
+/* [line 2647] */ 65b146:	31 c0                	xor    eax,eax
+                 65b148:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x3
+                 65b14f:	03
+                 65b150:	0f 9f c0             	setg   al
+/* [line 2650] */ 65b153:	01 d0                	add    eax,edx
+/* [line 2656] */ 65b155:	8b 4d 18             	mov    ecx,DWORD PTR [ebp+0x18]
+/* [line 2650] */ 65b158:	89 44 24 54          	mov    DWORD PTR [esp+0x54],eax
+/* [line 2653] */ 65b15c:	0f af 84 24 24 01 00 	imul   eax,DWORD PTR [esp+0x124]
+                 65b163:	00
+/* [line 2656] */ 65b164:	85 c9                	test   ecx,ecx
+/* [line 2653] */ 65b166:	89 44 24 44          	mov    DWORD PTR [esp+0x44],eax
+/* [line 2656] */ 65b16a:	b8 00 00 04 00       	mov    eax,0x40000
+                 65b16f:	74 0f                	je     65b180 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x1c0>
+/* [line 2659] */ 65b171:	83 7d 20 31          	cmp    DWORD PTR [ebp+0x20],0x31
+/* [line 2656] */ 65b175:	b8 00 00 10 00       	mov    eax,0x100000
+/* [line 2659] */ 65b17a:	0f 84 3d 0c 00 00    	je     65bdbd <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xdfd>
+/* [line 2691] */ 65b180:	8b 54 24 44          	mov    edx,DWORD PTR [esp+0x44]
+/* [line 2663] */ 65b184:	c7 84 24 c4 00 00 00 	mov    DWORD PTR [esp+0xc4],0x0
+                 65b18b:	00 00 00 00
+                 65b18f:	c7 84 24 c8 00 00 00 	mov    DWORD PTR [esp+0xc8],0x0
+                 65b196:	00 00 00 00
+                 65b19a:	c7 84 24 cc 00 00 00 	mov    DWORD PTR [esp+0xcc],0x0
+                 65b1a1:	00 00 00 00
+                 65b1a5:	c7 84 24 d0 00 00 00 	mov    DWORD PTR [esp+0xd0],0x0
+                 65b1ac:	00 00 00 00
+/* [line 2691] */ 65b1b0:	85 d2                	test   edx,edx
+                 65b1b2:	0f 8e c0 0a 00 00    	jle    65bc78 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xcb8>
+/* [line 2693] */ 65b1b8:	8b bc 24 04 01 00 00 	mov    edi,DWORD PTR [esp+0x104]
+                 65b1bf:	8b 74 24 54          	mov    esi,DWORD PTR [esp+0x54]
+/* [line 2829] */ 65b1c3:	8b 9c 24 04 01 00 00 	mov    ebx,DWORD PTR [esp+0x104]
+/* [line 2693] */ 65b1ca:	85 ff                	test   edi,edi
+                 65b1cc:	89 f7                	mov    edi,esi
+                 65b1ce:	0f 95 c1             	setne  cl
+                 65b1d1:	83 bc 24 08 01 00 00 	cmp    DWORD PTR [esp+0x108],0x1
+                 65b1d8:	01
+                 65b1d9:	0f 9f c2             	setg   dl
+                 65b1dc:	c1 e7 04             	shl    edi,0x4
+/* [line 2725] */ 65b1df:	0f af b4 24 14 01 00 	imul   esi,DWORD PTR [esp+0x114]
+                 65b1e6:	00
+/* [line 2693] */ 65b1e7:	09 d1                	or     ecx,edx
+                 65b1e9:	ba ff 00 00 00       	mov    edx,0xff
+                 65b1ee:	89 7c 24 68          	mov    DWORD PTR [esp+0x68],edi
+                 65b1f2:	88 4c 24 6e          	mov    BYTE PTR [esp+0x6e],cl
+                 65b1f6:	81 fe ff 00 00 00    	cmp    esi,0xff
+/* [line 2725] */ 65b1fc:	89 f1                	mov    ecx,esi
+                 65b1fe:	0f 4f ca             	cmovg  ecx,edx
+/* [line 2729] */ 65b201:	99                   	cdq
+                 65b202:	f7 7c 24 3c          	idiv   DWORD PTR [esp+0x3c]
+                 65b206:	39 c1                	cmp    ecx,eax
+                 65b208:	0f 4e c1             	cmovle eax,ecx
+                 65b20b:	0f b6 4c 24 0c       	movzx  ecx,BYTE PTR [esp+0xc]
+                 65b210:	89 6c 24 0c          	mov    DWORD PTR [esp+0xc],ebp
+                 65b214:	89 44 24 58          	mov    DWORD PTR [esp+0x58],eax
+/* [line 2827] */ 65b218:	8b 84 24 04 01 00 00 	mov    eax,DWORD PTR [esp+0x104]
+                 65b21f:	8d 50 ff             	lea    edx,[eax-0x1]
+                 65b222:	89 d0                	mov    eax,edx
+                 65b224:	c1 e8 1f             	shr    eax,0x1f
+                 65b227:	01 d0                	add    eax,edx
+                 65b229:	d1 f8                	sar    eax,1
+                 65b22b:	8d 78 02             	lea    edi,[eax+0x2]
+/* [line 2829] */ 65b22e:	89 c2                	mov    edx,eax
+/* [line 2816] */ 65b230:	83 c0 01             	add    eax,0x1
+/* [line 2829] */ 65b233:	f7 da                	neg    edx
+/* [line 2816] */ 65b235:	89 84 24 80 00 00 00 	mov    DWORD PTR [esp+0x80],eax
+/* [line 2895] */ 65b23c:	8b 44 24 74          	mov    eax,DWORD PTR [esp+0x74]
+/* [line 2829] */ 65b240:	8d 74 13 01          	lea    esi,[ebx+edx*1+0x1]
+/* [line 2827] */ 65b244:	89 7c 24 5c          	mov    DWORD PTR [esp+0x5c],edi
+/* [line 2829] */ 65b248:	89 74 24 64          	mov    DWORD PTR [esp+0x64],esi
+/* [line 2832] */ 65b24c:	01 fe                	add    esi,edi
+/* [line 2895] */ 65b24e:	85 c0                	test   eax,eax
+                 65b250:	8b 44 24 70          	mov    eax,DWORD PTR [esp+0x70]
+                 65b254:	0f 95 c2             	setne  dl
+/* [line 2832] */ 65b257:	89 74 24 60          	mov    DWORD PTR [esp+0x60],esi
+/* [line 2895] */ 65b25b:	85 c0                	test   eax,eax
+                 65b25d:	0f 95 c0             	setne  al
+                 65b260:	21 c2                	and    edx,eax
+                 65b262:	b8 01 00 00 00       	mov    eax,0x1
+                 65b267:	d3 e0                	shl    eax,cl
+                 65b269:	88 54 24 6f          	mov    BYTE PTR [esp+0x6f],dl
+                 65b26d:	89 84 24 84 00 00 00 	mov    DWORD PTR [esp+0x84],eax
+/* [line 2530] */ 65b274:	8b 84 24 20 01 00 00 	mov    eax,DWORD PTR [esp+0x120]
+                 65b27b:	8d 04 c5 f8 ff ff ff 	lea    eax,[eax*8-0x8]
+                 65b282:	89 84 24 9c 00 00 00 	mov    DWORD PTR [esp+0x9c],eax
+/* [line 2568] */ 65b289:	8b 84 24 20 01 00 00 	mov    eax,DWORD PTR [esp+0x120]
+                 65b290:	01 c0                	add    eax,eax
+                 65b292:	89 84 24 98 00 00 00 	mov    DWORD PTR [esp+0x98],eax
+                 65b299:	83 e8 02             	sub    eax,0x2
+                 65b29c:	89 84 24 b0 00 00 00 	mov    DWORD PTR [esp+0xb0],eax
+                 65b2a3:	eb 26                	jmp    65b2cb <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x30b>
+                 65b2a5:	8d 76 00             	lea    esi,[esi+0x0]
+/* [line 2920] */ 65b2a8:	8b 8c 24 10 01 00 00 	mov    ecx,DWORD PTR [esp+0x110]
+/* [line 2917] */ 65b2af:	8b 5c 24 30          	mov    ebx,DWORD PTR [esp+0x30]
+                 65b2b3:	29 5c 24 44          	sub    DWORD PTR [esp+0x44],ebx
+/* [line 2920] */ 65b2b7:	85 c9                	test   ecx,ecx
+                 65b2b9:	0f 85 91 04 00 00    	jne    65b750 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x790>
+/* [line 2691] */ 65b2bf:	8b 74 24 44          	mov    esi,DWORD PTR [esp+0x44]
+                 65b2c3:	85 f6                	test   esi,esi
+                 65b2c5:	0f 8e ad 09 00 00    	jle    65bc78 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xcb8>
+/* [line 2693] */ 65b2cb:	80 7c 24 6e 00       	cmp    BYTE PTR [esp+0x6e],0x0
+                 65b2d0:	8b 74 24 44          	mov    esi,DWORD PTR [esp+0x44]
+                 65b2d4:	89 f0                	mov    eax,esi
+                 65b2d6:	74 09                	je     65b2e1 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x321>
+                 65b2d8:	8b 7c 24 68          	mov    edi,DWORD PTR [esp+0x68]
+                 65b2dc:	39 f7                	cmp    edi,esi
+                 65b2de:	0f 4e c7             	cmovle eax,edi
+/* [line 2733] */ 65b2e1:	8b 74 24 58          	mov    esi,DWORD PTR [esp+0x58]
+                 65b2e5:	8b 7c 24 54          	mov    edi,DWORD PTR [esp+0x54]
+                 65b2e9:	39 f0                	cmp    eax,esi
+                 65b2eb:	0f 4f c6             	cmovg  eax,esi
+/* [line 2739] */ 65b2ee:	8b 74 24 3c          	mov    esi,DWORD PTR [esp+0x3c]
+/* [line 2733] */ 65b2f2:	99                   	cdq
+                 65b2f3:	f7 ff                	idiv   edi
+                 65b2f5:	ba 01 00 00 00       	mov    edx,0x1
+                 65b2fa:	0f af c7             	imul   eax,edi
+                 65b2fd:	85 c0                	test   eax,eax
+                 65b2ff:	0f 4f d0             	cmovg  edx,eax
+/* [line 2741] */ 65b302:	83 ec 0c             	sub    esp,0xc
+/* [line 2739] */ 65b305:	0f af f2             	imul   esi,edx
+                 65b308:	89 54 24 3c          	mov    DWORD PTR [esp+0x3c],edx
+/* [line 2741] */ 65b30c:	56                   	push   esi
+                 65b30d:	8b 5c 24 38          	mov    ebx,DWORD PTR [esp+0x38]
+                 65b311:	e8 ca f3 e2 ff       	call   48a6e0 <malloc@plt>
+                 65b316:	89 44 24 60          	mov    DWORD PTR [esp+0x60],eax
+/* [line 2742] */ 65b31a:	83 c4 10             	add    esp,0x10
+                 65b31d:	85 c0                	test   eax,eax
+                 65b31f:	74 87                	je     65b2a8 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x2e8>
+/* [line  363] */ 65b321:	bb 08 00 00 00       	mov    ebx,0x8
+/* [line  368] */ 65b326:	c6 84 24 d9 00 00 00 	mov    BYTE PTR [esp+0xd9],0x0
+                 65b32d:	00
+/* [line  372] */ 65b32e:	8d 94 24 d4 00 00 00 	lea    edx,[esp+0xd4]
+/* [line  363] */ 65b335:	66 89 9c 24 d4 00 00 	mov    WORD PTR [esp+0xd4],bx
+                 65b33c:	00
+/* [line  365] */ 65b33d:	8b 5c 24 30          	mov    ebx,DWORD PTR [esp+0x30]
+/* [line  372] */ 65b341:	83 ec 0c             	sub    esp,0xc
+/* [line  365] */ 65b344:	89 d8                	mov    eax,ebx
+/* [line  366] */ 65b346:	88 bc 24 e3 00 00 00 	mov    BYTE PTR [esp+0xe3],bh
+/* [line  367] */ 65b34d:	88 9c 24 e4 00 00 00 	mov    BYTE PTR [esp+0xe4],bl
+/* [line  365] */ 65b354:	c1 f8 10             	sar    eax,0x10
+                 65b357:	88 84 24 e2 00 00 00 	mov    BYTE PTR [esp+0xe2],al
+/* [line  370] */ 65b35e:	8b 44 24 18          	mov    eax,DWORD PTR [esp+0x18]
+                 65b362:	c7 80 94 00 00 00 08 	mov    DWORD PTR [eax+0x94],0x8
+                 65b369:	00 00 00
+/* [line  372] */ 65b36c:	56                   	push   esi
+                 65b36d:	8b 4c 24 60          	mov    ecx,DWORD PTR [esp+0x60]
+                 65b371:	e8 ca f3 ff ff       	call   65a740 <pie2_scsi(PIE2_T*, unsigned char*, unsigned char*, int) [clone .constprop.15]>
+/* [line 2744] */ 65b376:	83 c4 10             	add    esp,0x10
+                 65b379:	85 c0                	test   eax,eax
+                 65b37b:	0f 85 9b 01 00 00    	jne    65b51c <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x55c>
+                 65b381:	8b 44 24 0c          	mov    eax,DWORD PTR [esp+0xc]
+/* [line 2751] */ 65b385:	c7 44 24 20 00 00 00 	mov    DWORD PTR [esp+0x20],0x0
+                 65b38c:	00
+                 65b38d:	05 88 01 0a 00       	add    eax,0xa0188
+                 65b392:	89 44 24 4c          	mov    DWORD PTR [esp+0x4c],eax
+                 65b396:	8b 44 24 50          	mov    eax,DWORD PTR [esp+0x50]
+                 65b39a:	89 44 24 2c          	mov    DWORD PTR [esp+0x2c],eax
+                 65b39e:	66 90                	xchg   ax,ax
+/* [line 2757] */ 65b3a0:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x1
+                 65b3a7:	01
+/* [line 2753] */ 65b3a8:	8b 7c 24 2c          	mov    edi,DWORD PTR [esp+0x2c]
+                 65b3ac:	89 fb                	mov    ebx,edi
+/* [line 2757] */ 65b3ae:	0f 8e 64 02 00 00    	jle    65b618 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x658>
+/* [line 2759] */ 65b3b4:	0f b6 07             	movzx  eax,BYTE PTR [edi]
+                 65b3b7:	8d 5f 02             	lea    ebx,[edi+0x2]
+/* [line 2764] */ 65b3ba:	3c 52                	cmp    al,0x52
+                 65b3bc:	0f 94 c1             	sete   cl
+/* [line 2765] */ 65b3bf:	3c 40                	cmp    al,0x40
+                 65b3c1:	0f 94 c2             	sete   dl
+/* [line 2764] */ 65b3c4:	08 d1                	or     cl,dl
+                 65b3c6:	88 4c 24 6d          	mov    BYTE PTR [esp+0x6d],cl
+                 65b3ca:	0f 85 48 02 00 00    	jne    65b618 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x658>
+/* [line 2767] */ 65b3d0:	3c 47                	cmp    al,0x47
+/* [line 2769] */ 65b3d2:	bd 01 00 00 00       	mov    ebp,0x1
+/* [line 2767] */ 65b3d7:	0f 94 c1             	sete   cl
+/* [line 2768] */ 65b3da:	3c 50                	cmp    al,0x50
+                 65b3dc:	0f 94 c2             	sete   dl
+/* [line 2767] */ 65b3df:	08 d1                	or     cl,dl
+                 65b3e1:	75 1d                	jne    65b400 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x440>
+/* [line 2770] */ 65b3e3:	3c 42                	cmp    al,0x42
+                 65b3e5:	0f 84 b5 03 00 00    	je     65b7a0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x7e0>
+                 65b3eb:	3c 60                	cmp    al,0x60
+                 65b3ed:	c6 44 24 6d 01       	mov    BYTE PTR [esp+0x6d],0x1
+/* [line 2774] */ 65b3f2:	bd 03 00 00 00       	mov    ebp,0x3
+/* [line 2770] */ 65b3f7:	0f 84 a3 03 00 00    	je     65b7a0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x7e0>
+                 65b3fd:	8d 76 00             	lea    esi,[esi+0x0]
+                 65b400:	8b 44 24 0c          	mov    eax,DWORD PTR [esp+0xc]
+/* [line 2780] */ 65b404:	8b 7c 24 4c          	mov    edi,DWORD PTR [esp+0x4c]
+/* [line 2782] */ 65b408:	8b 8c 24 20 01 00 00 	mov    ecx,DWORD PTR [esp+0x120]
+                 65b40f:	8d 04 a8             	lea    eax,[eax+ebp*4]
+                 65b412:	89 44 24 38          	mov    DWORD PTR [esp+0x38],eax
+/* [line 2777] */ 65b416:	8b 80 f8 00 0a 00    	mov    eax,DWORD PTR [eax+0xa00f8]
+                 65b41c:	99                   	cdq
+                 65b41d:	c1 ea 19             	shr    edx,0x19
+                 65b420:	01 d0                	add    eax,edx
+                 65b422:	83 e0 7f             	and    eax,0x7f
+                 65b425:	29 d0                	sub    eax,edx
+                 65b427:	89 44 24 34          	mov    DWORD PTR [esp+0x34],eax
+/* [line 2780] */ 65b42b:	0f af 84 24 20 01 00 	imul   eax,DWORD PTR [esp+0x120]
+                 65b432:	00
+/* [line 2782] */ 65b433:	85 c9                	test   ecx,ecx
+/* [line 2780] */ 65b435:	8d 34 c7             	lea    esi,[edi+eax*8]
+                 65b438:	8b 84 ac c4 00 00 00 	mov    eax,DWORD PTR [esp+ebp*4+0xc4]
+                 65b43f:	89 74 24 48          	mov    DWORD PTR [esp+0x48],esi
+                 65b443:	89 44 24 10          	mov    DWORD PTR [esp+0x10],eax
+/* [line 2782] */ 65b447:	0f 8e 63 01 00 00    	jle    65b5b0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x5f0>
+/* [line 2795] */ 65b44d:	89 d8                	mov    eax,ebx
+/* [line 2782] */ 65b44f:	31 ff                	xor    edi,edi
+/* [line 2795] */ 65b451:	f7 d8                	neg    eax
+                 65b453:	89 44 24 18          	mov    DWORD PTR [esp+0x18],eax
+                 65b457:	e9 9b 00 00 00       	jmp    65b4f7 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x537>
+                 65b45c:	8d 74 26 00          	lea    esi,[esi+eiz*1+0x0]
+/* [line 2788] */ 65b460:	8b 44 24 0c          	mov    eax,DWORD PTR [esp+0xc]
+                 65b464:	8b 50 20             	mov    edx,DWORD PTR [eax+0x20]
+                 65b467:	0f b6 03             	movzx  eax,BYTE PTR [ebx]
+                 65b46a:	8d 4a da             	lea    ecx,[edx-0x26]
+                 65b46d:	83 f9 01             	cmp    ecx,0x1
+                 65b470:	76 09                	jbe    65b47b <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x4bb>
+                 65b472:	83 fa 24             	cmp    edx,0x24
+                 65b475:	0f 85 85 01 00 00    	jne    65b600 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x640>
+/* [line 2789] */ 65b47b:	8b 54 24 0c          	mov    edx,DWORD PTR [esp+0xc]
+                 65b47f:	0f b7 84 42 94 81 0a 	movzx  eax,WORD PTR [edx+eax*2+0x10a8194]
+                 65b486:	01
+/* [line 2798] */ 65b487:	83 fd 03             	cmp    ebp,0x3
+                 65b48a:	0f 84 86 00 00 00    	je     65b516 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x556>
+/* [line 2802] */ 65b490:	8b 94 24 04 01 00 00 	mov    edx,DWORD PTR [esp+0x104]
+                 65b497:	85 d2                	test   edx,edx
+                 65b499:	0f 84 f1 00 00 00    	je     65b590 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x5d0>
+/* [line 2805] */ 65b49f:	8b 4c 24 10          	mov    ecx,DWORD PTR [esp+0x10]
+                 65b4a3:	85 c9                	test   ecx,ecx
+                 65b4a5:	0f 84 d5 00 00 00    	je     65b580 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x5c0>
+/* [line 2809] */ 65b4ab:	83 7c 24 10 01       	cmp    DWORD PTR [esp+0x10],0x1
+                 65b4b0:	0f 84 a2 00 00 00    	je     65b558 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x598>
+/* [line 2824] */ 65b4b6:	66 3d ff ef          	cmp    ax,0xefff
+                 65b4ba:	77 24                	ja     65b4e0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x520>
+/* [line 2829] */ 65b4bc:	8b 4c 24 64          	mov    ecx,DWORD PTR [esp+0x64]
+                 65b4c0:	0f b7 c0             	movzx  eax,ax
+                 65b4c3:	99                   	cdq
+                 65b4c4:	f7 f9                	idiv   ecx
+/* [line 2832] */ 65b4c6:	0f b7 14 6e          	movzx  edx,WORD PTR [esi+ebp*2]
+                 65b4ca:	0f af 54 24 5c       	imul   edx,DWORD PTR [esp+0x5c]
+                 65b4cf:	0f b7 c0             	movzx  eax,ax
+                 65b4d2:	0f af c1             	imul   eax,ecx
+                 65b4d5:	01 d0                	add    eax,edx
+                 65b4d7:	99                   	cdq
+                 65b4d8:	f7 7c 24 60          	idiv   DWORD PTR [esp+0x60]
+                 65b4dc:	66 89 04 6e          	mov    WORD PTR [esi+ebp*2],ax
+/* [line 2782] */ 65b4e0:	83 c7 01             	add    edi,0x1
+                 65b4e3:	83 c6 08             	add    esi,0x8
+                 65b4e6:	03 5c 24 14          	add    ebx,DWORD PTR [esp+0x14]
+                 65b4ea:	39 bc 24 20 01 00 00 	cmp    DWORD PTR [esp+0x120],edi
+                 65b4f1:	0f 84 b9 00 00 00    	je     65b5b0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x5f0>
+/* [line 2786] */ 65b4f7:	83 bc 24 2c 01 00 00 	cmp    DWORD PTR [esp+0x12c],0x8
+                 65b4fe:	08
+                 65b4ff:	0f 8e 5b ff ff ff    	jle    65b460 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x4a0>
+/* [line 2795] */ 65b505:	8b 44 24 18          	mov    eax,DWORD PTR [esp+0x18]
+/* [line 2798] */ 65b509:	83 fd 03             	cmp    ebp,0x3
+/* [line 2795] */ 65b50c:	0f b7 04 58          	movzx  eax,WORD PTR [eax+ebx*2]
+/* [line 2798] */ 65b510:	0f 85 7a ff ff ff    	jne    65b490 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x4d0>
+/* [line 2800] */ 65b516:	66 89 46 06          	mov    WORD PTR [esi+0x6],ax
+                 65b51a:	eb c4                	jmp    65b4e0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x520>
+/* [line 2746] */ 65b51c:	83 ec 0c             	sub    esp,0xc
+                 65b51f:	ff 74 24 5c          	push   DWORD PTR [esp+0x5c]
+                 65b523:	8b 5c 24 38          	mov    ebx,DWORD PTR [esp+0x38]
+                 65b527:	e8 b4 e8 e2 ff       	call   489de0 <free@plt>
+                 65b52c:	83 c4 10             	add    esp,0x10
+/* [line 2747] */ 65b52f:	b8 01 00 00 00       	mov    eax,0x1
+/* [line 2933] */ 65b534:	8b b4 24 dc 00 00 00 	mov    esi,DWORD PTR [esp+0xdc]
+                 65b53b:	65 33 35 14 00 00 00 	xor    esi,DWORD PTR gs:0x14
+                 65b542:	0f 85 30 09 00 00    	jne    65be78 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xeb8>
+                 65b548:	81 c4 ec 00 00 00    	add    esp,0xec
+                 65b54e:	5b                   	pop    ebx
+                 65b54f:	5e                   	pop    esi
+                 65b550:	5f                   	pop    edi
+                 65b551:	5d                   	pop    ebp
+                 65b552:	c3                   	ret
+                 65b553:	90                   	nop
+                 65b554:	8d 74 26 00          	lea    esi,[esi+eiz*1+0x0]
+/* [line 2811] */ 65b558:	66 3d ff ef          	cmp    ax,0xefff
+                 65b55c:	77 82                	ja     65b4e0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x520>
+/* [line 2816] */ 65b55e:	8b 8c 24 80 00 00 00 	mov    ecx,DWORD PTR [esp+0x80]
+                 65b565:	0f b7 c0             	movzx  eax,ax
+                 65b568:	99                   	cdq
+                 65b569:	f7 f9                	idiv   ecx
+/* [line 2819] */ 65b56b:	0f b7 14 6e          	movzx  edx,WORD PTR [esi+ebp*2]
+                 65b56f:	0f b7 c0             	movzx  eax,ax
+                 65b572:	0f af c1             	imul   eax,ecx
+                 65b575:	01 d0                	add    eax,edx
+                 65b577:	99                   	cdq
+                 65b578:	f7 7c 24 5c          	idiv   DWORD PTR [esp+0x5c]
+                 65b57c:	8d 74 26 00          	lea    esi,[esi+eiz*1+0x0]
+                 65b580:	66 89 04 6e          	mov    WORD PTR [esi+ebp*2],ax
+                 65b584:	e9 57 ff ff ff       	jmp    65b4e0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x520>
+                 65b589:	8d b4 26 00 00 00 00 	lea    esi,[esi+eiz*1+0x0]
+/* [line 2838] */ 65b590:	8b 4c 24 24          	mov    ecx,DWORD PTR [esp+0x24]
+                 65b594:	83 f9 01             	cmp    ecx,0x1
+                 65b597:	7e 06                	jle    65b59f <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x5df>
+/* [line 2839] */ 65b599:	0f b7 c0             	movzx  eax,ax
+                 65b59c:	99                   	cdq
+                 65b59d:	f7 f9                	idiv   ecx
+/* [line 2841] */ 65b59f:	8b 54 24 10          	mov    edx,DWORD PTR [esp+0x10]
+                 65b5a3:	85 d2                	test   edx,edx
+                 65b5a5:	74 d9                	je     65b580 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x5c0>
+/* [line 2844] */ 65b5a7:	66 01 04 6e          	add    WORD PTR [esi+ebp*2],ax
+                 65b5ab:	e9 30 ff ff ff       	jmp    65b4e0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x520>
+/* [line 2848] */ 65b5b0:	8b 44 24 10          	mov    eax,DWORD PTR [esp+0x10]
+                 65b5b4:	83 c0 01             	add    eax,0x1
+/* [line 2850] */ 65b5b7:	39 44 24 24          	cmp    DWORD PTR [esp+0x24],eax
+                 65b5bb:	7e 6b                	jle    65b628 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x668>
+                 65b5bd:	80 7c 24 6d 00       	cmp    BYTE PTR [esp+0x6d],0x0
+                 65b5c2:	75 64                	jne    65b628 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x668>
+/* [line 2848] */ 65b5c4:	89 84 ac c4 00 00 00 	mov    DWORD PTR [esp+ebp*4+0xc4],eax
+/* [line 2751] */ 65b5cb:	83 44 24 20 01       	add    DWORD PTR [esp+0x20],0x1
+                 65b5d0:	8b 5c 24 3c          	mov    ebx,DWORD PTR [esp+0x3c]
+                 65b5d4:	8b 44 24 20          	mov    eax,DWORD PTR [esp+0x20]
+                 65b5d8:	01 5c 24 2c          	add    DWORD PTR [esp+0x2c],ebx
+                 65b5dc:	3b 44 24 30          	cmp    eax,DWORD PTR [esp+0x30]
+                 65b5e0:	0f 8c ba fd ff ff    	jl     65b3a0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x3e0>
+/* [line 2914] */ 65b5e6:	83 ec 0c             	sub    esp,0xc
+                 65b5e9:	ff 74 24 5c          	push   DWORD PTR [esp+0x5c]
+                 65b5ed:	8b 5c 24 38          	mov    ebx,DWORD PTR [esp+0x38]
+                 65b5f1:	e8 ea e7 e2 ff       	call   489de0 <free@plt>
+                 65b5f6:	83 c4 10             	add    esp,0x10
+                 65b5f9:	e9 aa fc ff ff       	jmp    65b2a8 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x2e8>
+                 65b5fe:	66 90                	xchg   ax,ax
+/* [line 2791] */ 65b600:	8b 54 24 0c          	mov    edx,DWORD PTR [esp+0xc]
+                 65b604:	8b 4a 40             	mov    ecx,DWORD PTR [edx+0x40]
+                 65b607:	89 4c 24 40          	mov    DWORD PTR [esp+0x40],ecx
+                 65b60b:	8d 49 f8             	lea    ecx,[ecx-0x8]
+                 65b60e:	d3 e0                	shl    eax,cl
+                 65b610:	e9 72 fe ff ff       	jmp    65b487 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x4c7>
+                 65b615:	8d 76 00             	lea    esi,[esi+0x0]
+/* [line 2766] */ 65b618:	31 ed                	xor    ebp,ebp
+/* [line 2764] */ 65b61a:	c6 44 24 6d 00       	mov    BYTE PTR [esp+0x6d],0x0
+                 65b61f:	e9 dc fd ff ff       	jmp    65b400 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x440>
+                 65b624:	8d 74 26 00          	lea    esi,[esi+eiz*1+0x0]
+/* [line 2855] */ 65b628:	8b 5c 24 0c          	mov    ebx,DWORD PTR [esp+0xc]
+                 65b62c:	8b 7c 24 34          	mov    edi,DWORD PTR [esp+0x34]
+                 65b630:	b8 01 00 00 00       	mov    eax,0x1
+                 65b635:	89 e9                	mov    ecx,ebp
+/* [line 2852] */ 65b637:	c7 84 ac c4 00 00 00 	mov    DWORD PTR [esp+ebp*4+0xc4],0x0
+                 65b63e:	00 00 00 00
+/* [line 2863] */ 65b642:	ba 01 00 00 00       	mov    edx,0x1
+/* [line 2855] */ 65b647:	d3 e0                	shl    eax,cl
+                 65b649:	0a 84 3b 08 01 0a 00 	or     al,BYTE PTR [ebx+edi*1+0xa0108]
+                 65b650:	88 84 3b 08 01 0a 00 	mov    BYTE PTR [ebx+edi*1+0xa0108],al
+/* [line 2858] */ 65b657:	8b 5c 24 38          	mov    ebx,DWORD PTR [esp+0x38]
+                 65b65b:	83 83 f8 00 0a 00 01 	add    DWORD PTR [ebx+0xa00f8],0x1
+/* [line 2862] */ 65b662:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x1
+                 65b669:	01
+                 65b66a:	74 14                	je     65b680 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x6c0>
+/* [line 2865] */ 65b66c:	31 d2                	xor    edx,edx
+                 65b66e:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x3
+                 65b675:	03
+                 65b676:	0f 95 c2             	setne  dl
+                 65b679:	8d 14 d5 07 00 00 00 	lea    edx,[edx*8+0x7]
+/* [line 2870] */ 65b680:	0f b6 c0             	movzx  eax,al
+                 65b683:	39 d0                	cmp    eax,edx
+                 65b685:	0f 85 40 ff ff ff    	jne    65b5cb <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x60b>
+/* [line 2876] */ 65b68b:	8b b4 24 10 01 00 00 	mov    esi,DWORD PTR [esp+0x110]
+/* [line 2872] */ 65b692:	8b 44 24 0c          	mov    eax,DWORD PTR [esp+0xc]
+                 65b696:	8b 5c 24 34          	mov    ebx,DWORD PTR [esp+0x34]
+/* [line 2876] */ 65b69a:	85 f6                	test   esi,esi
+/* [line 2872] */ 65b69c:	c6 84 18 08 01 0a 00 	mov    BYTE PTR [eax+ebx*1+0xa0108],0x0
+                 65b6a3:	00
+/* [line 2876] */ 65b6a4:	0f 84 c6 00 00 00    	je     65b770 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x7b0>
+/* [line 2879] */ 65b6aa:	8b 9c 24 18 01 00 00 	mov    ebx,DWORD PTR [esp+0x118]
+                 65b6b1:	85 db                	test   ebx,ebx
+                 65b6b3:	0f 85 c6 01 00 00    	jne    65b87f <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x8bf>
+/* [line 2883] */ 65b6b9:	8b 44 24 0c          	mov    eax,DWORD PTR [esp+0xc]
+                 65b6bd:	8b 7c 24 28          	mov    edi,DWORD PTR [esp+0x28]
+                 65b6c1:	8b b4 24 84 00 00 00 	mov    esi,DWORD PTR [esp+0x84]
+                 65b6c8:	8b 40 14             	mov    eax,DWORD PTR [eax+0x14]
+                 65b6cb:	8d 04 c0             	lea    eax,[eax+eax*8]
+                 65b6ce:	85 b4 87 1c 86 f9 ff 	test   DWORD PTR [edi+eax*4-0x679e4],esi
+                 65b6d5:	0f 85 d4 00 00 00    	jne    65b7af <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x7ef>
+/* [line 2887] */ 65b6db:	8b 44 24 0c          	mov    eax,DWORD PTR [esp+0xc]
+                 65b6df:	8b 9c 24 20 01 00 00 	mov    ebx,DWORD PTR [esp+0x120]
+                 65b6e6:	8b b0 bc 00 00 00    	mov    esi,DWORD PTR [eax+0xbc]
+                 65b6ec:	39 b0 c0 00 00 00    	cmp    DWORD PTR [eax+0xc0],esi
+                 65b6f2:	0f 8f 87 05 00 00    	jg     65bc7f <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xcbf>
+/* [line 2891] */ 65b6f8:	8b bc 24 1c 01 00 00 	mov    edi,DWORD PTR [esp+0x11c]
+                 65b6ff:	85 ff                	test   edi,edi
+                 65b701:	0f 85 73 06 00 00    	jne    65bd7a <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xdba>
+/* [line 2895] */ 65b707:	80 7c 24 6f 00       	cmp    BYTE PTR [esp+0x6f],0x0
+                 65b70c:	8b 84 24 28 01 00 00 	mov    eax,DWORD PTR [esp+0x128]
+                 65b713:	0f 84 b2 fe ff ff    	je     65b5cb <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x60b>
+/* [line 2903] */ 65b719:	83 ec 08             	sub    esp,0x8
+                 65b71c:	ff 74 24 50          	push   DWORD PTR [esp+0x50]
+                 65b720:	50                   	push   eax
+                 65b721:	8b 44 24 1c          	mov    eax,DWORD PTR [esp+0x1c]
+                 65b725:	ff 70 40             	push   DWORD PTR [eax+0x40]
+                 65b728:	ff b4 24 38 01 00 00 	push   DWORD PTR [esp+0x138]
+                 65b72f:	53                   	push   ebx
+                 65b730:	ff b4 24 8c 00 00 00 	push   DWORD PTR [esp+0x8c]
+                 65b737:	8b 84 24 94 00 00 00 	mov    eax,DWORD PTR [esp+0x94]
+                 65b73e:	ff d0                	call   eax
+                 65b740:	83 c4 20             	add    esp,0x20
+                 65b743:	e9 83 fe ff ff       	jmp    65b5cb <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x60b>
+                 65b748:	90                   	nop
+                 65b749:	8d b4 26 00 00 00 00 	lea    esi,[esi+eiz*1+0x0]
+/* [line 2920] */ 65b750:	8b 5c 24 28          	mov    ebx,DWORD PTR [esp+0x28]
+                 65b754:	e8 f7 29 f0 ff       	call   55e150 <sema_canc()>
+                 65b759:	85 c0                	test   eax,eax
+                 65b75b:	0f 84 5e fb ff ff    	je     65b2bf <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x2ff>
+/* [line 2922] */ 65b761:	8b 84 24 10 01 00 00 	mov    eax,DWORD PTR [esp+0x110]
+                 65b768:	e9 c7 fd ff ff       	jmp    65b534 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x574>
+                 65b76d:	8d 76 00             	lea    esi,[esi+0x0]
+/* [line 2895] */ 65b770:	80 7c 24 6f 00       	cmp    BYTE PTR [esp+0x6f],0x0
+                 65b775:	0f 84 50 fe ff ff    	je     65b5cb <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x60b>
+/* [line 2903] */ 65b77b:	8b b4 24 1c 01 00 00 	mov    esi,DWORD PTR [esp+0x11c]
+                 65b782:	8b 84 24 28 01 00 00 	mov    eax,DWORD PTR [esp+0x128]
+                 65b789:	8b 9c 24 20 01 00 00 	mov    ebx,DWORD PTR [esp+0x120]
+                 65b790:	85 f6                	test   esi,esi
+                 65b792:	0f 45 84 24 1c 01 00 	cmovne eax,DWORD PTR [esp+0x11c]
+                 65b799:	00
+                 65b79a:	e9 7a ff ff ff       	jmp    65b719 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x759>
+                 65b79f:	90                   	nop
+/* [line 2770] */ 65b7a0:	c6 44 24 6d 00       	mov    BYTE PTR [esp+0x6d],0x0
+/* [line 2772] */ 65b7a5:	bd 02 00 00 00       	mov    ebp,0x2
+                 65b7aa:	e9 51 fc ff ff       	jmp    65b400 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x440>
+/* [line 2531] */ 65b7af:	8b 5c 24 0c          	mov    ebx,DWORD PTR [esp+0xc]
+/* [line 2534] */ 65b7b3:	8b ac 24 20 01 00 00 	mov    ebp,DWORD PTR [esp+0x120]
+/* [line 2530] */ 65b7ba:	8b 44 24 48          	mov    eax,DWORD PTR [esp+0x48]
+                 65b7be:	03 84 24 9c 00 00 00 	add    eax,DWORD PTR [esp+0x9c]
+/* [line 2531] */ 65b7c5:	8d 93 e0 00 06 00    	lea    edx,[ebx+0x600e0]
+/* [line 2534] */ 65b7cb:	85 ed                	test   ebp,ebp
+/* [line 2531] */ 65b7cd:	89 54 24 48          	mov    DWORD PTR [esp+0x48],edx
+/* [line 2534] */ 65b7d1:	0f 8e 52 06 00 00    	jle    65be29 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xe69>
+                 65b7d7:	8b b4 24 20 01 00 00 	mov    esi,DWORD PTR [esp+0x120]
+                 65b7de:	31 db                	xor    ebx,ebx
+/* [line 2537] */ 65b7e0:	0f b7 08             	movzx  ecx,WORD PTR [eax]
+/* [line 2534] */ 65b7e3:	83 c3 01             	add    ebx,0x1
+/* [line 2540] */ 65b7e6:	83 e8 08             	sub    eax,0x8
+/* [line 2541] */ 65b7e9:	83 c2 08             	add    edx,0x8
+/* [line 2537] */ 65b7ec:	66 89 4a f8          	mov    WORD PTR [edx-0x8],cx
+                 65b7f0:	0f b7 48 0a          	movzx  ecx,WORD PTR [eax+0xa]
+                 65b7f4:	66 89 4a fa          	mov    WORD PTR [edx-0x6],cx
+                 65b7f8:	0f b7 48 0c          	movzx  ecx,WORD PTR [eax+0xc]
+                 65b7fc:	66 89 4a fc          	mov    WORD PTR [edx-0x4],cx
+                 65b800:	0f b7 48 0e          	movzx  ecx,WORD PTR [eax+0xe]
+                 65b804:	66 89 4a fe          	mov    WORD PTR [edx-0x2],cx
+/* [line 2534] */ 65b808:	39 de                	cmp    esi,ebx
+                 65b80a:	75 d4                	jne    65b7e0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x820>
+/* [line 2887] */ 65b80c:	8b 44 24 0c          	mov    eax,DWORD PTR [esp+0xc]
+                 65b810:	8b b0 c0 00 00 00    	mov    esi,DWORD PTR [eax+0xc0]
+                 65b816:	39 b0 bc 00 00 00    	cmp    DWORD PTR [eax+0xbc],esi
+                 65b81c:	0f 8c e9 05 00 00    	jl     65be0b <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xe4b>
+/* [line 2891] */ 65b822:	8b 84 24 1c 01 00 00 	mov    eax,DWORD PTR [esp+0x11c]
+                 65b829:	85 c0                	test   eax,eax
+                 65b82b:	0f 84 d6 fe ff ff    	je     65b707 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x747>
+                 65b831:	8b 44 24 48          	mov    eax,DWORD PTR [esp+0x48]
+/* [line 2513] */ 65b835:	bf ab aa aa aa       	mov    edi,0xaaaaaaab
+                 65b83a:	8d 34 d8             	lea    esi,[eax+ebx*8]
+                 65b83d:	89 c1                	mov    ecx,eax
+                 65b83f:	90                   	nop
+/* [line 2511] */ 65b840:	0f b7 11             	movzx  edx,WORD PTR [ecx]
+                 65b843:	0f b7 41 02          	movzx  eax,WORD PTR [ecx+0x2]
+                 65b847:	83 c1 08             	add    ecx,0x8
+                 65b84a:	01 d0                	add    eax,edx
+                 65b84c:	0f b7 51 fc          	movzx  edx,WORD PTR [ecx-0x4]
+                 65b850:	01 c2                	add    edx,eax
+/* [line 2513] */ 65b852:	89 d0                	mov    eax,edx
+                 65b854:	f7 e7                	mul    edi
+                 65b856:	d1 ea                	shr    edx,1
+/* [line 2516] */ 65b858:	66 89 51 f8          	mov    WORD PTR [ecx-0x8],dx
+                 65b85c:	66 89 51 fa          	mov    WORD PTR [ecx-0x6],dx
+                 65b860:	66 89 51 fc          	mov    WORD PTR [ecx-0x4],dx
+/* [line 2506] */ 65b864:	39 f1                	cmp    ecx,esi
+                 65b866:	75 d8                	jne    65b840 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x880>
+/* [line 2895] */ 65b868:	80 7c 24 6f 00       	cmp    BYTE PTR [esp+0x6f],0x0
+/* [line 2903] */ 65b86d:	8b 84 24 10 01 00 00 	mov    eax,DWORD PTR [esp+0x110]
+/* [line 2895] */ 65b874:	0f 85 9f fe ff ff    	jne    65b719 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x759>
+                 65b87a:	e9 4c fd ff ff       	jmp    65b5cb <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x60b>
+/* [line 2439] */ 65b87f:	8b 88 d0 00 00 00    	mov    ecx,DWORD PTR [eax+0xd0]
+                 65b885:	85 c9                	test   ecx,ecx
+                 65b887:	0f 8e 2c fe ff ff    	jle    65b6b9 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x6f9>
+/* [line 2442] */ 65b88d:	8b 94 24 28 01 00 00 	mov    edx,DWORD PTR [esp+0x128]
+                 65b894:	85 d2                	test   edx,edx
+                 65b896:	0f 8e b3 00 00 00    	jle    65b94f <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x98f>
+/* [line 2443] */ 65b89c:	0f b7 90 d8 00 04 00 	movzx  edx,WORD PTR [eax+0x400d8]
+/* [line 2442] */ 65b8a3:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x1
+                 65b8aa:	01
+/* [line 2443] */ 65b8ab:	c7 44 24 7c 00 00 00 	mov    DWORD PTR [esp+0x7c],0x0
+                 65b8b2:	00
+                 65b8b3:	89 54 24 78          	mov    DWORD PTR [esp+0x78],edx
+/* [line 2442] */ 65b8b7:	0f 84 92 00 00 00    	je     65b94f <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x98f>
+/* [line 2443] */ 65b8bd:	0f b7 88 da 00 04 00 	movzx  ecx,WORD PTR [eax+0x400da]
+/* [line 2442] */ 65b8c4:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x2
+                 65b8cb:	02
+/* [line 2443] */ 65b8cc:	c7 84 24 8c 00 00 00 	mov    DWORD PTR [esp+0x8c],0x0
+                 65b8d3:	00 00 00 00
+                 65b8d7:	89 8c 24 88 00 00 00 	mov    DWORD PTR [esp+0x88],ecx
+/* [line 2442] */ 65b8de:	74 6f                	je     65b94f <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x98f>
+/* [line 2443] */ 65b8e0:	0f b7 98 dc 00 04 00 	movzx  ebx,WORD PTR [eax+0x400dc]
+                 65b8e7:	31 ff                	xor    edi,edi
+/* [line 2442] */ 65b8e9:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x3
+                 65b8f0:	03
+/* [line 2443] */ 65b8f1:	89 de                	mov    esi,ebx
+/* [line 2442] */ 65b8f3:	74 19                	je     65b90e <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x94e>
+/* [line 2443] */ 65b8f5:	0f b7 80 de 00 04 00 	movzx  eax,WORD PTR [eax+0x400de]
+                 65b8fc:	c7 84 24 94 00 00 00 	mov    DWORD PTR [esp+0x94],0x0
+                 65b903:	00 00 00 00
+                 65b907:	89 84 24 90 00 00 00 	mov    DWORD PTR [esp+0x90],eax
+                 65b90e:	39 ca                	cmp    edx,ecx
+                 65b910:	c7 44 24 7c 00 00 00 	mov    DWORD PTR [esp+0x7c],0x0
+                 65b917:	00
+                 65b918:	0f 43 ca             	cmovae ecx,edx
+                 65b91b:	39 d9                	cmp    ecx,ebx
+                 65b91d:	89 4c 24 78          	mov    DWORD PTR [esp+0x78],ecx
+                 65b921:	73 08                	jae    65b92b <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x96b>
+                 65b923:	89 74 24 78          	mov    DWORD PTR [esp+0x78],esi
+                 65b927:	89 7c 24 7c          	mov    DWORD PTR [esp+0x7c],edi
+/* [line 2455] */ 65b92b:	8b 44 24 78          	mov    eax,DWORD PTR [esp+0x78]
+                 65b92f:	8b 54 24 7c          	mov    edx,DWORD PTR [esp+0x7c]
+                 65b933:	89 84 24 a0 00 00 00 	mov    DWORD PTR [esp+0xa0],eax
+                 65b93a:	89 94 24 a4 00 00 00 	mov    DWORD PTR [esp+0xa4],edx
+                 65b941:	89 84 24 88 00 00 00 	mov    DWORD PTR [esp+0x88],eax
+                 65b948:	89 94 24 8c 00 00 00 	mov    DWORD PTR [esp+0x8c],edx
+/* [line 2458] */ 65b94f:	8b 84 24 20 01 00 00 	mov    eax,DWORD PTR [esp+0x120]
+                 65b956:	85 c0                	test   eax,eax
+                 65b958:	0f 8e 5b fd ff ff    	jle    65b6b9 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x6f9>
+                 65b95e:	8b 44 24 48          	mov    eax,DWORD PTR [esp+0x48]
+                 65b962:	31 ed                	xor    ebp,ebp
+                 65b964:	8b 74 24 0c          	mov    esi,DWORD PTR [esp+0xc]
+                 65b968:	89 44 24 10          	mov    DWORD PTR [esp+0x10],eax
+                 65b96c:	e9 c5 01 00 00       	jmp    65bb36 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xb76>
+/* [line 2473] */ 65b971:	89 44 24 18          	mov    DWORD PTR [esp+0x18],eax
+                 65b975:	89 54 24 1c          	mov    DWORD PTR [esp+0x1c],edx
+                 65b979:	d9 bc 24 b6 00 00 00 	fnstcw WORD PTR [esp+0xb6]
+                 65b980:	8b 44 24 28          	mov    eax,DWORD PTR [esp+0x28]
+                 65b984:	df 6c 24 18          	fild   QWORD PTR [esp+0x18]
+/* [line 2478] */ 65b988:	31 c9                	xor    ecx,ecx
+/* [line 2473] */ 65b98a:	d8 88 e0 05 93 ff    	fmul   DWORD PTR [eax-0x6cfa20]
+                 65b990:	0f b7 84 24 b6 00 00 	movzx  eax,WORD PTR [esp+0xb6]
+                 65b997:	00
+                 65b998:	80 cc 0c             	or     ah,0xc
+                 65b99b:	66 89 84 24 b4 00 00 	mov    WORD PTR [esp+0xb4],ax
+                 65b9a2:	00
+                 65b9a3:	d9 ac 24 b4 00 00 00 	fldcw  WORD PTR [esp+0xb4]
+                 65b9aa:	df bc 24 a8 00 00 00 	fistp  QWORD PTR [esp+0xa8]
+                 65b9b1:	d9 ac 24 b6 00 00 00 	fldcw  WORD PTR [esp+0xb6]
+                 65b9b8:	8b 94 24 ac 00 00 00 	mov    edx,DWORD PTR [esp+0xac]
+                 65b9bf:	8b 84 24 a8 00 00 00 	mov    eax,DWORD PTR [esp+0xa8]
+/* [line 2478] */ 65b9c6:	85 d2                	test   edx,edx
+                 65b9c8:	0f 89 5c 02 00 00    	jns    65bc2a <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xc6a>
+/* [line 2460] */ 65b9ce:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x2
+                 65b9d5:	02
+/* [line 2483] */ 65b9d6:	8b 44 24 10          	mov    eax,DWORD PTR [esp+0x10]
+                 65b9da:	66 89 4c e8 02       	mov    WORD PTR [eax+ebp*8+0x2],cx
+/* [line 2460] */ 65b9df:	0f 84 41 01 00 00    	je     65bb26 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xb66>
+/* [line 2465] */ 65b9e5:	0f b7 9c 6e 8c 01 0a 	movzx  ebx,WORD PTR [esi+ebp*2+0x10a018c]
+                 65b9ec:	01
+/* [line 2462] */ 65b9ed:	0f b7 4c e8 04       	movzx  ecx,WORD PTR [eax+ebp*8+0x4]
+                 65b9f2:	31 d2                	xor    edx,edx
+/* [line 2465] */ 65b9f4:	c7 44 24 1c 00 00 00 	mov    DWORD PTR [esp+0x1c],0x0
+                 65b9fb:	00
+                 65b9fc:	8b be c4 00 00 00    	mov    edi,DWORD PTR [esi+0xc4]
+                 65ba02:	0f b7 9c 5e e0 00 05 	movzx  ebx,WORD PTR [esi+ebx*2+0x500e0]
+                 65ba09:	00
+/* [line 2462] */ 65ba0a:	89 c8                	mov    eax,ecx
+/* [line 2467] */ 65ba0c:	85 db                	test   ebx,ebx
+/* [line 2465] */ 65ba0e:	89 5c 24 18          	mov    DWORD PTR [esp+0x18],ebx
+/* [line 2467] */ 65ba12:	0f 84 2d 02 00 00    	je     65bc45 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xc85>
+/* [line 2468] */ 65ba18:	f7 a4 24 a0 00 00 00 	mul    DWORD PTR [esp+0xa0]
+                 65ba1f:	8b 9c 24 a4 00 00 00 	mov    ebx,DWORD PTR [esp+0xa4]
+                 65ba26:	ff 74 24 1c          	push   DWORD PTR [esp+0x1c]
+                 65ba2a:	ff 74 24 1c          	push   DWORD PTR [esp+0x1c]
+                 65ba2e:	0f af d9             	imul   ebx,ecx
+                 65ba31:	01 da                	add    edx,ebx
+                 65ba33:	52                   	push   edx
+                 65ba34:	50                   	push   eax
+                 65ba35:	8b 5c 24 38          	mov    ebx,DWORD PTR [esp+0x38]
+                 65ba39:	e8 d2 d4 e2 ff       	call   488f10 <__divdi3@plt>
+                 65ba3e:	83 c4 10             	add    esp,0x10
+/* [line 2470] */ 65ba41:	85 ff                	test   edi,edi
+                 65ba43:	0f 84 04 02 00 00    	je     65bc4d <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xc8d>
+/* [line 2475] */ 65ba49:	89 44 24 18          	mov    DWORD PTR [esp+0x18],eax
+                 65ba4d:	89 54 24 1c          	mov    DWORD PTR [esp+0x1c],edx
+                 65ba51:	d9 bc 24 b6 00 00 00 	fnstcw WORD PTR [esp+0xb6]
+                 65ba58:	8b 44 24 28          	mov    eax,DWORD PTR [esp+0x28]
+                 65ba5c:	df 6c 24 18          	fild   QWORD PTR [esp+0x18]
+/* [line 2478] */ 65ba60:	31 c9                	xor    ecx,ecx
+/* [line 2475] */ 65ba62:	d8 88 f8 b1 96 ff    	fmul   DWORD PTR [eax-0x694e08]
+                 65ba68:	0f b7 84 24 b6 00 00 	movzx  eax,WORD PTR [esp+0xb6]
+                 65ba6f:	00
+                 65ba70:	80 cc 0c             	or     ah,0xc
+                 65ba73:	66 89 84 24 b4 00 00 	mov    WORD PTR [esp+0xb4],ax
+                 65ba7a:	00
+                 65ba7b:	d9 ac 24 b4 00 00 00 	fldcw  WORD PTR [esp+0xb4]
+                 65ba82:	df bc 24 a8 00 00 00 	fistp  QWORD PTR [esp+0xa8]
+                 65ba89:	d9 ac 24 b6 00 00 00 	fldcw  WORD PTR [esp+0xb6]
+                 65ba90:	8b 94 24 ac 00 00 00 	mov    edx,DWORD PTR [esp+0xac]
+                 65ba97:	8b 84 24 a8 00 00 00 	mov    eax,DWORD PTR [esp+0xa8]
+/* [line 2478] */ 65ba9e:	85 d2                	test   edx,edx
+                 65baa0:	0f 89 a7 01 00 00    	jns    65bc4d <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xc8d>
+/* [line 2460] */ 65baa6:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x3
+                 65baad:	03
+/* [line 2483] */ 65baae:	8b 44 24 10          	mov    eax,DWORD PTR [esp+0x10]
+                 65bab2:	66 89 4c e8 04       	mov    WORD PTR [eax+ebp*8+0x4],cx
+/* [line 2460] */ 65bab7:	74 6d                	je     65bb26 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xb66>
+/* [line 2465] */ 65bab9:	0f b7 9c 6e 8c 01 0a 	movzx  ebx,WORD PTR [esi+ebp*2+0x10a018c]
+                 65bac0:	01
+/* [line 2462] */ 65bac1:	0f b7 4c e8 06       	movzx  ecx,WORD PTR [eax+ebp*8+0x6]
+                 65bac6:	31 d2                	xor    edx,edx
+/* [line 2465] */ 65bac8:	c7 44 24 1c 00 00 00 	mov    DWORD PTR [esp+0x1c],0x0
+                 65bacf:	00
+                 65bad0:	0f b7 9c 5e e0 80 05 	movzx  ebx,WORD PTR [esi+ebx*2+0x580e0]
+                 65bad7:	00
+/* [line 2462] */ 65bad8:	89 c8                	mov    eax,ecx
+/* [line 2467] */ 65bada:	85 db                	test   ebx,ebx
+/* [line 2465] */ 65badc:	89 5c 24 18          	mov    DWORD PTR [esp+0x18],ebx
+/* [line 2467] */ 65bae0:	74 29                	je     65bb0b <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xb4b>
+/* [line 2468] */ 65bae2:	f7 a4 24 90 00 00 00 	mul    DWORD PTR [esp+0x90]
+                 65bae9:	8b 9c 24 94 00 00 00 	mov    ebx,DWORD PTR [esp+0x94]
+                 65baf0:	ff 74 24 1c          	push   DWORD PTR [esp+0x1c]
+                 65baf4:	ff 74 24 1c          	push   DWORD PTR [esp+0x1c]
+                 65baf8:	0f af d9             	imul   ebx,ecx
+                 65bafb:	01 da                	add    edx,ebx
+                 65bafd:	52                   	push   edx
+                 65bafe:	50                   	push   eax
+                 65baff:	8b 5c 24 38          	mov    ebx,DWORD PTR [esp+0x38]
+                 65bb03:	e8 08 d4 e2 ff       	call   488f10 <__divdi3@plt>
+                 65bb08:	83 c4 10             	add    esp,0x10
+/* [line 2483] */ 65bb0b:	89 d1                	mov    ecx,edx
+                 65bb0d:	83 f9 00             	cmp    ecx,0x0
+                 65bb10:	7c 0b                	jl     65bb1d <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xb5d>
+                 65bb12:	0f 8e c1 02 00 00    	jle    65bdd9 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xe19>
+                 65bb18:	b8 ff ff 00 00       	mov    eax,0xffff
+                 65bb1d:	8b 5c 24 10          	mov    ebx,DWORD PTR [esp+0x10]
+                 65bb21:	66 89 44 eb 06       	mov    WORD PTR [ebx+ebp*8+0x6],ax
+/* [line 2458] */ 65bb26:	83 c5 01             	add    ebp,0x1
+                 65bb29:	39 ac 24 20 01 00 00 	cmp    DWORD PTR [esp+0x120],ebp
+                 65bb30:	0f 84 83 fb ff ff    	je     65b6b9 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x6f9>
+/* [line 2460] */ 65bb36:	8b 84 24 28 01 00 00 	mov    eax,DWORD PTR [esp+0x128]
+                 65bb3d:	85 c0                	test   eax,eax
+                 65bb3f:	7e e5                	jle    65bb26 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xb66>
+/* [line 2465] */ 65bb41:	0f b7 8c 6e 8c 01 0a 	movzx  ecx,WORD PTR [esi+ebp*2+0x10a018c]
+                 65bb48:	01
+/* [line 2462] */ 65bb49:	8b 44 24 10          	mov    eax,DWORD PTR [esp+0x10]
+/* [line 2465] */ 65bb4d:	31 db                	xor    ebx,ebx
+/* [line 2462] */ 65bb4f:	c7 44 24 1c 00 00 00 	mov    DWORD PTR [esp+0x1c],0x0
+                 65bb56:	00
+                 65bb57:	0f b7 04 e8          	movzx  eax,WORD PTR [eax+ebp*8]
+/* [line 2465] */ 65bb5b:	0f b7 94 4e e0 00 04 	movzx  edx,WORD PTR [esi+ecx*2+0x400e0]
+                 65bb62:	00
+/* [line 2462] */ 65bb63:	89 44 24 18          	mov    DWORD PTR [esp+0x18],eax
+/* [line 2467] */ 65bb67:	85 d2                	test   edx,edx
+/* [line 2465] */ 65bb69:	89 d1                	mov    ecx,edx
+/* [line 2467] */ 65bb6b:	74 29                	je     65bb96 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xbd6>
+/* [line 2468] */ 65bb6d:	8b 7c 24 7c          	mov    edi,DWORD PTR [esp+0x7c]
+                 65bb71:	89 44 24 18          	mov    DWORD PTR [esp+0x18],eax
+                 65bb75:	0f af f8             	imul   edi,eax
+                 65bb78:	f7 64 24 78          	mul    DWORD PTR [esp+0x78]
+                 65bb7c:	53                   	push   ebx
+                 65bb7d:	51                   	push   ecx
+                 65bb7e:	01 fa                	add    edx,edi
+                 65bb80:	52                   	push   edx
+                 65bb81:	50                   	push   eax
+                 65bb82:	8b 5c 24 38          	mov    ebx,DWORD PTR [esp+0x38]
+                 65bb86:	e8 85 d3 e2 ff       	call   488f10 <__divdi3@plt>
+                 65bb8b:	83 c4 10             	add    esp,0x10
+                 65bb8e:	89 44 24 18          	mov    DWORD PTR [esp+0x18],eax
+                 65bb92:	89 54 24 1c          	mov    DWORD PTR [esp+0x1c],edx
+/* [line 2483] */ 65bb96:	8b 4c 24 1c          	mov    ecx,DWORD PTR [esp+0x1c]
+                 65bb9a:	8b 54 24 18          	mov    edx,DWORD PTR [esp+0x18]
+                 65bb9e:	83 f9 00             	cmp    ecx,0x0
+                 65bba1:	89 d0                	mov    eax,edx
+                 65bba3:	7c 0b                	jl     65bbb0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xbf0>
+                 65bba5:	0f 8e bd 00 00 00    	jle    65bc68 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xca8>
+                 65bbab:	b8 ff ff 00 00       	mov    eax,0xffff
+/* [line 2460] */ 65bbb0:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x1
+                 65bbb7:	01
+/* [line 2483] */ 65bbb8:	8b 7c 24 10          	mov    edi,DWORD PTR [esp+0x10]
+                 65bbbc:	66 89 04 ef          	mov    WORD PTR [edi+ebp*8],ax
+/* [line 2460] */ 65bbc0:	0f 84 60 ff ff ff    	je     65bb26 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xb66>
+/* [line 2465] */ 65bbc6:	0f b7 9c 6e 8c 01 0a 	movzx  ebx,WORD PTR [esi+ebp*2+0x10a018c]
+                 65bbcd:	01
+/* [line 2462] */ 65bbce:	0f b7 4c ef 02       	movzx  ecx,WORD PTR [edi+ebp*8+0x2]
+                 65bbd3:	31 d2                	xor    edx,edx
+/* [line 2465] */ 65bbd5:	c7 44 24 1c 00 00 00 	mov    DWORD PTR [esp+0x1c],0x0
+                 65bbdc:	00
+                 65bbdd:	8b be c4 00 00 00    	mov    edi,DWORD PTR [esi+0xc4]
+                 65bbe3:	0f b7 9c 5e e0 80 04 	movzx  ebx,WORD PTR [esi+ebx*2+0x480e0]
+                 65bbea:	00
+/* [line 2462] */ 65bbeb:	89 c8                	mov    eax,ecx
+/* [line 2467] */ 65bbed:	85 db                	test   ebx,ebx
+/* [line 2465] */ 65bbef:	89 5c 24 18          	mov    DWORD PTR [esp+0x18],ebx
+/* [line 2467] */ 65bbf3:	74 2d                	je     65bc22 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xc62>
+/* [line 2468] */ 65bbf5:	8b 84 24 8c 00 00 00 	mov    eax,DWORD PTR [esp+0x8c]
+                 65bbfc:	0f af c1             	imul   eax,ecx
+                 65bbff:	89 c3                	mov    ebx,eax
+                 65bc01:	89 c8                	mov    eax,ecx
+                 65bc03:	f7 a4 24 88 00 00 00 	mul    DWORD PTR [esp+0x88]
+                 65bc0a:	ff 74 24 1c          	push   DWORD PTR [esp+0x1c]
+                 65bc0e:	ff 74 24 1c          	push   DWORD PTR [esp+0x1c]
+                 65bc12:	01 da                	add    edx,ebx
+                 65bc14:	52                   	push   edx
+                 65bc15:	50                   	push   eax
+                 65bc16:	8b 5c 24 38          	mov    ebx,DWORD PTR [esp+0x38]
+                 65bc1a:	e8 f1 d2 e2 ff       	call   488f10 <__divdi3@plt>
+                 65bc1f:	83 c4 10             	add    esp,0x10
+/* [line 2470] */ 65bc22:	85 ff                	test   edi,edi
+                 65bc24:	0f 85 47 fd ff ff    	jne    65b971 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x9b1>
+                 65bc2a:	83 fa 00             	cmp    edx,0x0
+                 65bc2d:	89 c1                	mov    ecx,eax
+                 65bc2f:	0f 8c 99 fd ff ff    	jl     65b9ce <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xa0e>
+                 65bc35:	0f 8e ae 01 00 00    	jle    65bde9 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xe29>
+                 65bc3b:	b9 ff ff 00 00       	mov    ecx,0xffff
+                 65bc40:	e9 89 fd ff ff       	jmp    65b9ce <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xa0e>
+                 65bc45:	85 ff                	test   edi,edi
+                 65bc47:	0f 85 fc fd ff ff    	jne    65ba49 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xa89>
+                 65bc4d:	83 fa 00             	cmp    edx,0x0
+                 65bc50:	89 c1                	mov    ecx,eax
+                 65bc52:	0f 8c 4e fe ff ff    	jl     65baa6 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xae6>
+                 65bc58:	0f 8e 9c 01 00 00    	jle    65bdfa <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xe3a>
+                 65bc5e:	b9 ff ff 00 00       	mov    ecx,0xffff
+                 65bc63:	e9 3e fe ff ff       	jmp    65baa6 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xae6>
+/* [line 2483] */ 65bc68:	3d ff ff 00 00       	cmp    eax,0xffff
+                 65bc6d:	0f 86 3d ff ff ff    	jbe    65bbb0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xbf0>
+                 65bc73:	e9 33 ff ff ff       	jmp    65bbab <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xbeb>
+/* [line 2605] */ 65bc78:	31 c0                	xor    eax,eax
+                 65bc7a:	e9 b5 f8 ff ff       	jmp    65b534 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x574>
+/* [line 2559] */ 65bc7f:	85 db                	test   ebx,ebx
+/* [line 2556] */ 65bc81:	8d 90 e0 00 08 00    	lea    edx,[eax+0x800e0]
+/* [line 2559] */ 65bc87:	0f 8e c7 01 00 00    	jle    65be54 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xe94>
+/* [line 2780] */ 65bc8d:	8b 44 24 48          	mov    eax,DWORD PTR [esp+0x48]
+                 65bc91:	89 de                	mov    esi,ebx
+/* [line 2556] */ 65bc93:	89 54 24 48          	mov    DWORD PTR [esp+0x48],edx
+                 65bc97:	31 c9                	xor    ecx,ecx
+                 65bc99:	8d b4 26 00 00 00 00 	lea    esi,[esi+eiz*1+0x0]
+/* [line 2562] */ 65bca0:	0f b7 18             	movzx  ebx,WORD PTR [eax]
+/* [line 2559] */ 65bca3:	83 c1 01             	add    ecx,0x1
+/* [line 2564] */ 65bca6:	83 c0 08             	add    eax,0x8
+/* [line 2565] */ 65bca9:	83 c2 10             	add    edx,0x10
+/* [line 2562] */ 65bcac:	66 89 5a f0          	mov    WORD PTR [edx-0x10],bx
+                 65bcb0:	0f b7 58 fa          	movzx  ebx,WORD PTR [eax-0x6]
+                 65bcb4:	66 89 5a f2          	mov    WORD PTR [edx-0xe],bx
+                 65bcb8:	0f b7 58 fc          	movzx  ebx,WORD PTR [eax-0x4]
+                 65bcbc:	66 89 5a f4          	mov    WORD PTR [edx-0xc],bx
+                 65bcc0:	0f b7 58 fe          	movzx  ebx,WORD PTR [eax-0x2]
+                 65bcc4:	66 89 5a f6          	mov    WORD PTR [edx-0xa],bx
+/* [line 2559] */ 65bcc8:	39 ce                	cmp    esi,ecx
+                 65bcca:	7f d4                	jg     65bca0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xce0>
+/* [line 2571] */ 65bccc:	8b 9c 24 98 00 00 00 	mov    ebx,DWORD PTR [esp+0x98]
+                 65bcd3:	83 fb 01             	cmp    ebx,0x1
+                 65bcd6:	0f 8e 1c fa ff ff    	jle    65b6f8 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x738>
+                 65bcdc:	8b 84 24 b0 00 00 00 	mov    eax,DWORD PTR [esp+0xb0]
+                 65bce3:	8b 54 24 0c          	mov    edx,DWORD PTR [esp+0xc]
+                 65bce7:	8d 70 04             	lea    esi,[eax+0x4]
+                 65bcea:	b8 02 00 00 00       	mov    eax,0x2
+                 65bcef:	90                   	nop
+/* [line 2576] */ 65bcf0:	8d 48 fe             	lea    ecx,[eax-0x2]
+                 65bcf3:	39 d8                	cmp    eax,ebx
+                 65bcf5:	0f 4c c8             	cmovl  ecx,eax
+                 65bcf8:	8d 3c ca             	lea    edi,[edx+ecx*8]
+/* [line 2580] */ 65bcfb:	0f b7 8c c2 d0 00 08 	movzx  ecx,WORD PTR [edx+eax*8+0x800d0]
+                 65bd02:	00
+                 65bd03:	0f b7 af e0 00 08 00 	movzx  ebp,WORD PTR [edi+0x800e0]
+                 65bd0a:	01 e9                	add    ecx,ebp
+                 65bd0c:	0f b7 ac c2 d2 00 08 	movzx  ebp,WORD PTR [edx+eax*8+0x800d2]
+                 65bd13:	00
+                 65bd14:	d1 f9                	sar    ecx,1
+                 65bd16:	66 89 8c c2 d8 00 08 	mov    WORD PTR [edx+eax*8+0x800d8],cx
+                 65bd1d:	00
+                 65bd1e:	0f b7 8f e2 00 08 00 	movzx  ecx,WORD PTR [edi+0x800e2]
+                 65bd25:	01 e9                	add    ecx,ebp
+                 65bd27:	0f b7 ac c2 d4 00 08 	movzx  ebp,WORD PTR [edx+eax*8+0x800d4]
+                 65bd2e:	00
+                 65bd2f:	d1 f9                	sar    ecx,1
+                 65bd31:	66 89 8c c2 da 00 08 	mov    WORD PTR [edx+eax*8+0x800da],cx
+                 65bd38:	00
+                 65bd39:	0f b7 8f e4 00 08 00 	movzx  ecx,WORD PTR [edi+0x800e4]
+                 65bd40:	01 e9                	add    ecx,ebp
+                 65bd42:	d1 f9                	sar    ecx,1
+                 65bd44:	66 89 8c c2 dc 00 08 	mov    WORD PTR [edx+eax*8+0x800dc],cx
+                 65bd4b:	00
+                 65bd4c:	0f b7 8f e6 00 08 00 	movzx  ecx,WORD PTR [edi+0x800e6]
+                 65bd53:	0f b7 bc c2 d6 00 08 	movzx  edi,WORD PTR [edx+eax*8+0x800d6]
+                 65bd5a:	00
+                 65bd5b:	01 f9                	add    ecx,edi
+                 65bd5d:	d1 f9                	sar    ecx,1
+                 65bd5f:	66 89 8c c2 de 00 08 	mov    WORD PTR [edx+eax*8+0x800de],cx
+                 65bd66:	00
+                 65bd67:	83 c0 02             	add    eax,0x2
+/* [line 2571] */ 65bd6a:	39 f0                	cmp    eax,esi
+                 65bd6c:	75 82                	jne    65bcf0 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xd30>
+                 65bd6e:	8b 9c 24 98 00 00 00 	mov    ebx,DWORD PTR [esp+0x98]
+                 65bd75:	e9 a8 fa ff ff       	jmp    65b822 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x862>
+/* [line 2506] */ 65bd7a:	85 db                	test   ebx,ebx
+                 65bd7c:	0f 8f af fa ff ff    	jg     65b831 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x871>
+                 65bd82:	e9 e1 fa ff ff       	jmp    65b868 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x8a8>
+/* [line 2637] */ 65bd87:	f6 84 24 0c 01 00 00 	test   BYTE PTR [esp+0x10c],0x1
+                 65bd8e:	01
+                 65bd8f:	0f 85 d6 00 00 00    	jne    65be6b <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xeab>
+                 65bd95:	83 bc 24 28 01 00 00 	cmp    DWORD PTR [esp+0x128],0x1
+                 65bd9c:	01
+                 65bd9d:	0f 85 c8 00 00 00    	jne    65be6b <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xeab>
+/* [line 2639] */ 65bda3:	8d 04 40             	lea    eax,[eax+eax*2]
+/* [line 2640] */ 65bda6:	c7 44 24 14 03 00 00 	mov    DWORD PTR [esp+0x14],0x3
+                 65bdad:	00
+/* [line 2639] */ 65bdae:	89 44 24 3c          	mov    DWORD PTR [esp+0x3c],eax
+/* [line 2636] */ 65bdb2:	8b 54 24 24          	mov    edx,DWORD PTR [esp+0x24]
+/* [line 2647] */ 65bdb6:	31 c0                	xor    eax,eax
+                 65bdb8:	e9 96 f3 ff ff       	jmp    65b153 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x193>
+/* [line 2660] */ 65bdbd:	81 bd c0 00 00 00 20 	cmp    DWORD PTR [ebp+0xc0],0x1c20
+                 65bdc4:	1c 00 00
+                 65bdc7:	ba 00 00 10 00       	mov    edx,0x100000
+                 65bdcc:	b8 00 00 40 00       	mov    eax,0x400000
+                 65bdd1:	0f 45 c2             	cmovne eax,edx
+                 65bdd4:	e9 a7 f3 ff ff       	jmp    65b180 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x1c0>
+/* [line 2483] */ 65bdd9:	3d ff ff 00 00       	cmp    eax,0xffff
+                 65bdde:	0f 86 39 fd ff ff    	jbe    65bb1d <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xb5d>
+                 65bde4:	e9 2f fd ff ff       	jmp    65bb18 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xb58>
+                 65bde9:	81 f9 ff ff 00 00    	cmp    ecx,0xffff
+                 65bdef:	0f 86 d9 fb ff ff    	jbe    65b9ce <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xa0e>
+                 65bdf5:	e9 41 fe ff ff       	jmp    65bc3b <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xc7b>
+                 65bdfa:	81 f9 ff ff 00 00    	cmp    ecx,0xffff
+                 65be00:	0f 86 a0 fc ff ff    	jbe    65baa6 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xae6>
+                 65be06:	e9 53 fe ff ff       	jmp    65bc5e <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xc9e>
+                 65be0b:	89 c7                	mov    edi,eax
+                 65be0d:	8b b4 24 20 01 00 00 	mov    esi,DWORD PTR [esp+0x120]
+/* [line 2884] */ 65be14:	8b 44 24 48          	mov    eax,DWORD PTR [esp+0x48]
+/* [line 2556] */ 65be18:	81 c7 e0 00 08 00    	add    edi,0x800e0
+                 65be1e:	89 7c 24 48          	mov    DWORD PTR [esp+0x48],edi
+                 65be22:	89 fa                	mov    edx,edi
+                 65be24:	e9 6e fe ff ff       	jmp    65bc97 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xcd7>
+                 65be29:	89 d8                	mov    eax,ebx
+/* [line 2887] */ 65be2b:	8b 9b c0 00 00 00    	mov    ebx,DWORD PTR [ebx+0xc0]
+                 65be31:	39 98 bc 00 00 00    	cmp    DWORD PTR [eax+0xbc],ebx
+                 65be37:	7c 24                	jl     65be5d <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xe9d>
+/* [line 2891] */ 65be39:	8b 94 24 1c 01 00 00 	mov    edx,DWORD PTR [esp+0x11c]
+                 65be40:	8b 9c 24 20 01 00 00 	mov    ebx,DWORD PTR [esp+0x120]
+                 65be47:	85 d2                	test   edx,edx
+                 65be49:	0f 84 b8 f8 ff ff    	je     65b707 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x747>
+                 65be4f:	e9 14 fa ff ff       	jmp    65b868 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0x8a8>
+/* [line 2556] */ 65be54:	89 54 24 48          	mov    DWORD PTR [esp+0x48],edx
+                 65be58:	e9 6f fe ff ff       	jmp    65bccc <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xd0c>
+                 65be5d:	05 e0 00 08 00       	add    eax,0x800e0
+                 65be62:	89 44 24 48          	mov    DWORD PTR [esp+0x48],eax
+                 65be66:	e9 61 fe ff ff       	jmp    65bccc <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xd0c>
+/* [line 2636] */ 65be6b:	c7 44 24 14 01 00 00 	mov    DWORD PTR [esp+0x14],0x1
+                 65be72:	00
+                 65be73:	e9 3a ff ff ff       	jmp    65bdb2 <pie2_rlin(PIE2_T*, int, void*, int (*)(void*, int, int, int, int, unsigned short*), char const*, int, int, int, int, int, int, int, int, int, int, int) [clone .isra.8]+0xdf2>
+/* [line 2933] */ 65be78:	e8 c3 cd 1b 01       	call   1818c40 <__stack_chk_fail_local>
+/* [line    -] */ 65be7d:	66 90                	xchg   ax,ax
+                 65be7f:	90                   	nop

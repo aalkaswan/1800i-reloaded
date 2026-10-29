@@ -1,0 +1,154 @@
+  65cb80:	8b 47 14             	mov    eax,DWORD PTR [edi+0x14]
+  65cb83:	8b 54 24 10          	mov    edx,DWORD PTR [esp+0x10]
+  65cb87:	8d 04 c0             	lea    eax,[eax+eax*8]
+  65cb8a:	8b 84 82 0c 86 f9 ff 	mov    eax,DWORD PTR [edx+eax*4-0x679f4]
+  65cb91:	83 f8 02             	cmp    eax,0x2
+  65cb94:	0f 84 94 06 00 00    	je     65d22e <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0xcde>
+/home/hamrick/vssrc/vues/pie2.cpp:3051
+  65cb9a:	83 f8 03             	cmp    eax,0x3
+  65cb9d:	75 19                	jne    65cbb8 <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x668>
+/home/hamrick/vssrc/vues/pie2.cpp:3052
+  65cb9f:	83 7c 24 14 01       	cmp    DWORD PTR [esp+0x14],0x1
+  65cba4:	b8 00 00 00 00       	mov    eax,0x0
+  65cba9:	0f 45 84 24 d4 00 00 	cmovne eax,DWORD PTR [esp+0xd4]
+  65cbb0:	00 
+  65cbb1:	89 84 24 d4 00 00 00 	mov    DWORD PTR [esp+0xd4],eax
+/home/hamrick/vssrc/vues/pie2.cpp:363
+  65cbb8:	b9 01 00 00 00       	mov    ecx,0x1
+pie2_exec():
+/home/hamrick/vssrc/vues/pie2.cpp:363
+  65cbbd:	c7 44 24 68 1b 00 00 	mov    DWORD PTR [esp+0x68],0x1b
+  65cbc4:	00 
+/home/hamrick/vssrc/vues/pie2.cpp:372
+  65cbc5:	83 ec 0c             	sub    esp,0xc
+/home/hamrick/vssrc/vues/pie2.cpp:363
+  65cbc8:	66 89 4c 24 78       	mov    WORD PTR [esp+0x78],cx
+/home/hamrick/vssrc/vues/pie2.cpp:370
+  65cbcd:	c7 87 94 00 00 00 1b 	mov    DWORD PTR [edi+0x94],0x1b
+  65cbd4:	00 00 00 
+/home/hamrick/vssrc/vues/pie2.cpp:372
+  65cbd7:	31 c9                	xor    ecx,ecx
+  65cbd9:	6a 00                	push   0x0
+  65cbdb:	89 ea                	mov    edx,ebp
+  65cbdd:	89 f8                	mov    eax,edi
+  65cbdf:	e8 5c db ff ff       	call   65a740 <_ZL9pie2_scsiP6PIE2_TPhS1_i.constprop.15>
+_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11():
+/home/hamrick/vssrc/vues/pie2.cpp:1280
+  65cbe4:	83 c4 10             	add    esp,0x10
+pie2_star():
+/home/hamrick/vssrc/vues/pie2.cpp:1280
+  65cbe7:	85 c0                	test   eax,eax
+pie2_exec():
+/home/hamrick/vssrc/vues/pie2.cpp:372
+  65cbe9:	89 c6                	mov    esi,eax
+pie2_star():
+/home/hamrick/vssrc/vues/pie2.cpp:1280
+  65cbeb:	74 09                	je     65cbf6 <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x6a6>
+  65cbed:	83 f8 0e             	cmp    eax,0xe
+  65cbf0:	0f 85 b2 fc ff ff    	jne    65c8a8 <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x358>
+_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11():
+/home/hamrick/vssrc/vues/pie2.cpp:381
+  65cbf6:	8b 5c 24 10          	mov    ebx,DWORD PTR [esp+0x10]
+pie2_wait():
+/home/hamrick/vssrc/vues/pie2.cpp:381
+  65cbfa:	e8 81 9c ef ff       	call   556880 <_Z9user_timev>
+_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11():
+/home/hamrick/vssrc/vues/pie2.cpp:358
+  65cbff:	8b 97 94 00 00 00    	mov    edx,DWORD PTR [edi+0x94]
+pie2_exec():
+/home/hamrick/vssrc/vues/pie2.cpp:358
+  65cc05:	85 d2                	test   edx,edx
+  65cc07:	0f 84 80 00 00 00    	je     65cc8d <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x73d>
+  65cc0d:	89 74 24 30          	mov    DWORD PTR [esp+0x30],esi
+  65cc11:	89 c6                	mov    esi,eax
+  65cc13:	eb 39                	jmp    65cc4e <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x6fe>
+  65cc15:	8d 76 00             	lea    esi,[esi+0x0]
+pie2_wait():
+/home/hamrick/vssrc/vues/pie2.cpp:389
+  65cc18:	8b 5c 24 10          	mov    ebx,DWORD PTR [esp+0x10]
+  65cc1c:	e8 5f 9c ef ff       	call   556880 <_Z9user_timev>
+  65cc21:	29 f0                	sub    eax,esi
+  65cc23:	83 f8 3b             	cmp    eax,0x3b
+  65cc26:	0f 8f 7c fc ff ff    	jg     65c8a8 <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x358>
+/home/hamrick/vssrc/vues/pie2.cpp:392
+  65cc2c:	83 ec 0c             	sub    esp,0xc
+  65cc2f:	68 f4 01 00 00       	push   0x1f4
+  65cc34:	8b 5c 24 20          	mov    ebx,DWORD PTR [esp+0x20]
+  65cc38:	e8 d3 9e ef ff       	call   556b10 <_Z9user_waiti>
+pie2_exec():
+/home/hamrick/vssrc/vues/pie2.cpp:358
+  65cc3d:	8b 87 94 00 00 00    	mov    eax,DWORD PTR [edi+0x94]
+  65cc43:	83 c4 10             	add    esp,0x10
+  65cc46:	85 c0                	test   eax,eax
+  65cc48:	0f 84 70 0d 00 00    	je     65d9be <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x146e>
+/home/hamrick/vssrc/vues/pie2.cpp:363
+  65cc4e:	31 c0                	xor    eax,eax
+  65cc50:	c7 44 24 68 00 00 00 	mov    DWORD PTR [esp+0x68],0x0
+  65cc57:	00 
+/home/hamrick/vssrc/vues/pie2.cpp:372
+  65cc58:	83 ec 0c             	sub    esp,0xc
+/home/hamrick/vssrc/vues/pie2.cpp:363
+  65cc5b:	66 89 44 24 78       	mov    WORD PTR [esp+0x78],ax
+/home/hamrick/vssrc/vues/pie2.cpp:370
+  65cc60:	c7 87 94 00 00 00 00 	mov    DWORD PTR [edi+0x94],0x0
+  65cc67:	00 00 00 
+/home/hamrick/vssrc/vues/pie2.cpp:372
+  65cc6a:	31 c9                	xor    ecx,ecx
+  65cc6c:	6a 00                	push   0x0
+  65cc6e:	89 ea                	mov    edx,ebp
+  65cc70:	89 f8                	mov    eax,edi
+  65cc72:	e8 c9 da ff ff       	call   65a740 <_ZL9pie2_scsiP6PIE2_TPhS1_i.constprop.15>
+pie2_wait():
+/home/hamrick/vssrc/vues/pie2.cpp:386
+  65cc77:	83 c4 10             	add    esp,0x10
+  65cc7a:	3d 04 00 00 80       	cmp    eax,0x80000004
+  65cc7f:	74 97                	je     65cc18 <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x6c8>
+pie2_star():
+/home/hamrick/vssrc/vues/pie2.cpp:1284
+  65cc81:	85 c0                	test   eax,eax
+  65cc83:	8b 74 24 30          	mov    esi,DWORD PTR [esp+0x30]
+  65cc87:	0f 85 1b fc ff ff    	jne    65c8a8 <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x358>
+_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11():
+/home/hamrick/vssrc/vues/pie2.cpp:3058
+  65cc8d:	83 fe 0e             	cmp    esi,0xe
+  65cc90:	0f 85 7b 0e 00 00    	jne    65db11 <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x15c1>
+/home/hamrick/vssrc/vues/pie2.cpp:381
+  65cc96:	8b 5c 24 10          	mov    ebx,DWORD PTR [esp+0x10]
+pie2_wait():
+/home/hamrick/vssrc/vues/pie2.cpp:381
+  65cc9a:	e8 e1 9b ef ff       	call   556880 <_Z9user_timev>
+  65cc9f:	89 c6                	mov    esi,eax
+_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11():
+/home/hamrick/vssrc/vues/pie2.cpp:358
+  65cca1:	8b 87 94 00 00 00    	mov    eax,DWORD PTR [edi+0x94]
+/home/hamrick/vssrc/vues/pie2.cpp:3059
+  65cca7:	c7 84 24 d4 00 00 00 	mov    DWORD PTR [esp+0xd4],0x1
+  65ccae:	01 00 00 00 
+pie2_exec():
+/home/hamrick/vssrc/vues/pie2.cpp:358
+
+--- targets ---
+  65d7a1:	83 c4 10             	add    esp,0x10
+  65d7a4:	e9 87 f5 ff ff       	jmp    65cd30 <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0x7e0>
+  65d7a9:	8d b4 26 00 00 00 00 	lea    esi,[esi+eiz*1+0x0]
+_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11():
+/home/hamrick/vssrc/vues/pie2.cpp:3043
+  65d7b0:	d9 ee                	fldz
+/home/hamrick/vssrc/vues/pie2.cpp:3041
+  65d7b2:	c7 87 e0 00 0a 00 18 	mov    DWORD PTR [edi+0xa00e0],0xfffffc18
+  65d7b9:	fc ff ff 
+/home/hamrick/vssrc/vues/pie2.cpp:3042
+  65d7bc:	c7 87 e4 00 0a 00 01 	mov    DWORD PTR [edi+0xa00e4],0x1
+  65d7c3:	00 00 00 
+/home/hamrick/vssrc/vues/pie2.cpp:3043
+  65d7c6:	ba 18 fc ff ff       	mov    edx,0xfffffc18
+  65d7cb:	dd 9f e8 00 0a 00    	fstp   QWORD PTR [edi+0xa00e8]
+  65d7d1:	e9 6d fa ff ff       	jmp    65d243 <_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11+0xcf3>
+/home/hamrick/vssrc/vues/pie2.cpp:381
+  65d7d6:	8b 5c 24 10          	mov    ebx,DWORD PTR [esp+0x10]
+pie2_wait():
+/home/hamrick/vssrc/vues/pie2.cpp:381
+  65d7da:	e8 a1 90 ef ff       	call   556880 <_Z9user_timev>
+  65d7df:	89 c6                	mov    esi,eax
+_ZL9pie2_lscaPviiiiiiiiiiiiiiiiiiiS_PFiS_iiiiPtEPKcS_S2_S4_i.isra.10.part.11():
+/home/hamrick/vssrc/vues/pie2.cpp:358
