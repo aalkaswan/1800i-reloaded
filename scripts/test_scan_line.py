@@ -82,7 +82,18 @@ def main():
     except Exception:
         pass
 
-    dev.set_configuration()
+    try:
+        dev.get_active_configuration()
+    except Exception:
+        try:
+            dev.set_configuration()
+        except Exception:
+            pass
+
+    try:
+        usb.util.claim_interface(dev, 0)
+    except Exception:
+        pass
 
     print("[*] Step 1: Initializing GL640USB transceiver & CyberView EPP Mode 0x80...")
     wctl(dev, 0x8b, 0x00)
