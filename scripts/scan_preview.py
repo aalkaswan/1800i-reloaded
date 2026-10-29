@@ -106,20 +106,20 @@ def set_window(dev, start=0, length=LINE_BYTES):
     asic_write(dev, 0x95, (start >> 16) & 0xff)
 
 def step_motor_forward(dev, steps=1):
-    """Step motor forward (0x10002630 / 0x10002520)."""
+    """Step motor forward into scan area (0x10002638 / 0x10002cbb: 0x85 -> 0x16)."""
+    asic_write(dev, 0x85, 0x16)
+    asic_write(dev, 0x81, steps)
+    asic_write(dev, 0x83, 0x01)
+    wait_idle(dev)
+    time.sleep(0.005)
+
+def step_motor_backward(dev, steps=1):
+    """Step motor backward toward home stop (0x1000263c / 0x1000286c: 0x85 -> 0x14)."""
     asic_write(dev, 0x85, 0x14)
     asic_write(dev, 0x81, steps)
     asic_write(dev, 0x83, 0x01)
     wait_idle(dev)
-    time.sleep(0.01)
-
-def step_motor_backward(dev, steps=1):
-    """Step motor backward (home return)."""
-    asic_write(dev, 0x85, 0x16)
-    asic_write(dev, 0x81, steps)
-    asic_write(dev, 0x83, 0x00)
-    wait_idle(dev)
-    time.sleep(0.01)
+    time.sleep(0.005)
 
 def save_ppm(filename, width, height, data):
     """Save raw RGB data as binary Netpbm PPM."""

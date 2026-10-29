@@ -76,7 +76,8 @@ def step_motor(dev, direction, steps):
     direction: 'forward' (0x14) or 'backward' (0x16)
     steps: 1..255 steps
     """
-    cmd = 0x14 if direction == 'forward' else 0x16
+    # Direction: 0x16 is FORWARD (into scan area), 0x14 is BACKWARD (toward home bumper)
+    cmd = 0x16 if direction == 'forward' else 0x14
     print(f"[*] Stepping motor {direction.upper()} by {steps} steps (0x85 -> 0x{cmd:02x}, 0x81 -> {steps})...")
     asic_write(dev, 0x85, cmd)
     asic_write(dev, 0x81, steps)
