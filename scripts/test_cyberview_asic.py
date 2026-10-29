@@ -105,7 +105,18 @@ def main():
     except Exception:
         pass
 
-    dev.set_configuration()
+    try:
+        dev.get_active_configuration()
+    except Exception:
+        try:
+            dev.set_configuration()
+        except Exception:
+            pass
+
+    try:
+        usb.util.claim_interface(dev, 0)
+    except Exception:
+        pass
 
     # Step 1: Enable transceiver on GL640USB
     print("[*] Step 1: Enabling GL640USB transceiver (reg 0x8b -> 0x00, 0x40)...")

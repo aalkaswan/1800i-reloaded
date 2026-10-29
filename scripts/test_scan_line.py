@@ -2,7 +2,7 @@
 """
 PrimeFilm 1800u / 1800i First Optical Line Acquisition Test
 Acquires 1 raw 1800-DPI scanline (5,400 bytes = 1800 pixels x 3 channels RGB)
-Reconstructed from PF1800U.dll (functions 0x100035e0, 0x100035a0, 0x100034f0).
+Reconstructed from PF1800U.dll (functions 0x10002410, 0x10002520, 0x10002920, 0x100035a0).
 """
 
 import sys
@@ -64,6 +64,57 @@ def asic_read(dev, reg, timeout=1000):
     wctl(dev, 0x83, reg, timeout=timeout)
     return rctl(dev, 0x84, timeout=timeout)
 
+def wait_idle(dev, timeout=5.0):
+    """Wait until ASIC busy bits (0x1e) in register 0x84 clear (0x10002920)."""
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        val = asic_read(dev, 0x84)
+        if val is not None and (val & 0x1e) == 0:
+            return True
+        time.sleep(0.002)
+    return False
+
+def configure_hardware(dev):
+    """Hardware configuration sequence from PF1800U.dll at 0x10002410."""
+    print("[*] Writing ASIC clock, timing, and AFE registers (0x10002410)...")
+    asic_write(dev, 0xc4, 0x00)
+    asic_write(dev, 0xab, 0xaa)
+    asic_write(dev, 0xac, 0xca)
+    asic_write(dev, 0xad, 0x4b)
+    asic_write(dev, 0xae, 0x05)
+    asic_write(dev, 0xc1, 0x07)
+    asic_write(dev, 0xc2, 0x04)
+    asic_write(dev, 0xc3, 0x12)
+    asic_write(dev, 0xc5, 0x12)
+    asic_write(dev, 0xe1, 0x00)
+    asic_write(dev, 0xe5, 0x00)
+    asic_write(dev, 0xe9, 0x00)
+    asic_write(dev, 0x86, 0x10)
+
+def set_exposure_limits(dev, r_limit=0xffffff, g_limit=0xffffff, b_limit=0xffffff):
+    """Max exposure limits from 0x10002bc0."""
+    asic_read(dev, 0x87)
+    asic_write(dev, 0xa2, r_limit & 0xff)
+    asic_write(dev, 0xa3, g_limit & 0xff)
+    asic_write(dev, 0xa4, b_limit & 0xff)
+    asic_write(dev, 0xa5, (r_limit >> 8) & 0xff)
+    asic_write(dev, 0xa6, (g_limit >> 8) & 0xff)
+    asic_write(dev, 0xa7, (b_limit >> 8) & 0xff)
+    asic_write(dev, 0xa8, (r_limit >> 16) & 0xff)
+    asic_write(dev, 0xa9, (g_limit >> 16) & 0xff)
+    asic_write(dev, 0xaa, (b_limit >> 16) & 0xff)
+
+def set_window(dev, start=0, length=LINE_BYTES):
+    """Set SRAM window start and length (0x10002aa0 and 0x10002ae0)."""
+    # Window End: 0x90..0x92
+    asic_write(dev, 0x90, length & 0xff)
+    asic_write(dev, 0x91, (length >> 8) & 0xff)
+    asic_write(dev, 0x92, (length >> 16) & 0xff)
+    # Window Start / Read Pointer: 0x93..0x95
+    asic_write(dev, 0x93, start & 0xff)
+    asic_write(dev, 0x94, (start >> 8) & 0xff)
+    asic_write(dev, 0x95, (start >> 16) & 0xff)
+
 def main():
     print("=" * 70)
     print("PRIME FILM 1800u / 1800i FIRST OPTICAL SCANLINE ACQUISITION")
@@ -103,6 +154,8 @@ def main():
     cyberview_init(dev)
     print("[+] Bridge in EPP Data Mode 0x80!")
 
+    configure_hardware(dev)
+
     status = asic_read(dev, 0x86)
     print(f"[*] Initial Status (reg 0x86): 0x{status:02x}")
 
@@ -129,21 +182,36 @@ def main():
     asic_write(dev, 0xe6, 0x02)
     asic_write(dev, 0xea, 0x02)
 
-    # Set scan window length (0x1518 = 5400)
-    asic_write(dev, 0x90, 0x18)
-    asic_write(dev, 0x91, 0x15)
-    asic_write(dev, 0x92, 0x00)
+    # Set scan window (start=0, end=5400)
+    set_window(dev, start=0, length=LINE_BYTES)
 
-    print("\n[*] Step 3: Arming DMA Descriptor on Register 0x82 (0x100035a0)...")
+    # Set exposure limits
+    set_exposure_limits(dev)
+
+    # Wait for sensor idle
+    wait_idle(dev)
+
+    print("\n[*] Step 3: Triggering Scan Acquisition (0x85 -> 0x12)...")
+    asic_write(dev, 0x85, 0x12)
+
+    print("[*] Waiting for ASIC optical integration to finish (polling reg 0x84)...")
+    if wait_idle(dev):
+        print("[+] Optical exposure complete! Data ready in ASIC SRAM.")
+    else:
+        print("[!] Warning: Optical exposure wait timed out.")
+
+    print("\n[*] Step 4: Arming DMA Descriptor on Register 0x82 (0x100035a0)...")
+    # Reset read pointer to 0 before DMA
+    asic_write(dev, 0x93, 0x00)
+    asic_write(dev, 0x94, 0x00)
+    asic_write(dev, 0x95, 0x00)
+
     # Set EPP Address to 0x80 (SRAM Data Port)
     wctl(dev, 0x83, 0x80)
 
     # 8-byte DMA transfer descriptor: [0, 0, ep_channel=1, 0, length_le32]
     dma_desc = struct.pack("<BBBB I", 0x00, 0x00, 0x01, 0x00, LINE_BYTES)
     wctl(dev, 0x82, dma_desc)
-
-    print("\n[*] Step 4: Triggering Scan Acquisition (0x85 -> 0x12)...")
-    asic_write(dev, 0x85, 0x12)
 
     print(f"[*] Step 5: Reading {LINE_BYTES} bytes from Bulk IN Endpoint 0x{EP_IN:02x}...")
     try:
@@ -158,6 +226,8 @@ def main():
         print(f"    Line Pixel Statistics: Min={min_v}, Max={max_v}, Avg={avg_v:.2f}")
         print("    First 32 bytes of raw CCD scanline:")
         print("   ", raw_bytes[:32].hex(" "))
+        print("    Middle 32 bytes (around center):")
+        print("   ", raw_bytes[2688:2720].hex(" "))
 
         out_file = "/home/aalkaswan/Desktop/1800i-reloaded/test_scanline.bin"
         with open(out_file, "wb") as f:
