@@ -1,0 +1,109 @@
+; PF1800U.INF  -- Windows Still Image Setup File
+; Copyright (c) 1999 Pacific Image Electronics .
+; Manufacturer:  Pacific Image Electronics.
+; For Windows Vista x86 & x64
+; Created by: Fiyon
+
+[Version]
+Signature="$CHICAGO$"
+Class=Image
+provider=%Msft%
+LayoutFile=layout.inf
+
+[ControlFlags]
+ExcludeFromSelect=*
+
+[DestinationDirs]
+DefaultDestDir=11
+Sys32Files=10,system32\drivers
+Sys32Files.NT=10,system32\drivers
+TwainFiles=10
+CyberView=10,"Twain_32\%CyberViewDir%"
+Resource=11
+
+[Manufacturer]
+%MfgName% = PIE , NTx86.5.1 , NTamd64 , NTia64
+
+[PIE]
+%USB\VID_05E3&PID_0120.DeviceDesc% = CyberViewSetup , USB\VID_05E3&PID_0120
+
+[PIE.NTx86.5.1]
+%USB\VID_05E3&PID_0120.DeviceDesc% = CyberViewSetup , USB\VID_05E3&PID_0120
+
+[PIE.NTamd64]
+%USB\VID_05E3&PID_0120.DeviceDesc% = CyberViewSetup , USB\VID_05E3&PID_0120
+
+[PIE.NTia64]
+%USB\VID_05E3&PID_0120.DeviceDesc% = CyberViewSetup , USB\VID_05E3&PID_0120
+
+
+[PreCopySection]
+HKR,,NoSetupUI,,1
+
+;.....................................................Win9X Section 
+
+[CyberViewSetup]
+SubClass=StillImage
+DeviceType=1
+AddReg=PIEUSBAddReg.Win
+CopyFiles=Sys32Files
+
+
+[PIEUSBAddReg.Win]
+HKR,,DevLoader,,*ntkern
+HKR,,NTMPDriver,,geneusb.sys
+
+[Sys32Files]
+Geneusb.sys,,,0x20
+
+;.....................................................Win2000 Section 
+
+[CyberViewSetup.NT]
+SubClass=StillImage
+DeviceType=1
+AddReg=CyberViewSetup.Addreg.NT
+CopyFiles=Sys32Files.NT
+Include= sti.inf
+Needs= STI.USBSection
+
+[CyberViewSetup.Addreg.NT]
+HKR,,DevLoader,,*ntkern
+HKR,,NTMPDriver,,usbscan.sys
+HKLM,"System\Currentcontrolset\Services\PIEUsb\Parameters","MaximumTransferSize",0x10001,4096
+HKLM,"System\Currentcontrolset\Services\PIEUsb\Parameters","DebugLevel",0x10001,2
+;Include= sti.inf
+;Needs= STI.USBSection.Services
+
+
+[CyberViewSetup.NT.Services]
+Addservice = PIEUSB, 0x00000002, CyberViewSetup.AddService
+Include= sti.inf
+Needs= STI.USBSection.Services
+
+[CyberViewSetup.AddService]
+DisplayName    = %PIEUSB.SvcDesc%
+ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
+StartType      = 2                  ; SERVICE_AUTO_START
+ErrorControl   = 1                  ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %10%\System32\Drivers\usbscan.sys
+LoadOrderGroup = Base
+Include= sti.inf
+STI.UsbScan.AddService
+
+
+
+[Sys32Files.NT]
+usbscan.sys
+
+;.....................................................SourceFile
+;[SourceDisksNames] 
+
+
+;[SourceDisksFiles]
+
+
+[Strings] 
+Msft="Single Frame Film Scanner Vendor"     
+USB\VID_05E3&PID_0120.DeviceDesc="Single Frame Film Scanner"
+MfgName="Single Frame Film Scanner Vendor"
+PIEUSB.SvcDesc="Single Frame Film Scanner"
