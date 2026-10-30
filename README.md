@@ -196,6 +196,8 @@ Per-bracket dark frames ($D_k(x)$, lamp OFF) eliminate thermal DSNU drift before
 | **Extended 4-Bracket** (`1000, 2900, 5800, 11600`) | $11.6\times$ | **$+3.54\text{ EV}$** | **$+21.29\text{ dB}$** | **$3.55\text{ D}$** | Full archival dynamic range; extracts deep shadow micro-detail with zero clipping. |
 | **Ultra-Dmax 5-Bracket** (`1000, 2900, 5800, 11600, 23200`) | $23.2\times$ | **$+4.54\text{ EV}$** | **$+27.31\text{ dB}$** | **$3.86\text{ D}$** | Maximum optical density; unlocks effective **17.54 EV** total system dynamic range. |
 
+![Multi-Exposure Analog Bracketed HDR Comparison Matrix](docs/images/comparison_bracketed_hdr.png)
+
 ---
 
 ## 4. Repository Layout
