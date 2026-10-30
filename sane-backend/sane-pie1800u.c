@@ -221,7 +221,7 @@ SANE_Status sane_pie1800u_get_parameters(SANE_Handle handle, SANE_Parameters *pa
     params->format = SANE_FRAME_RGB;
     params->last_frame = SANE_TRUE;
     params->pixels_per_line = PIE1800_LINE_PIXELS;
-    params->lines = 2450; // Calibrated 35mm frame length (34.6 mm at 1800 DPI)
+    params->lines = 875; // Verified physical frame length (875 steps from offset 1380 = 2255 max)
     params->depth = 8;
     params->bytes_per_line = PIE1800_LINE_PIXELS * 3;
 

@@ -160,9 +160,9 @@ def save_ppm(filename, width, height, rgb_bytes):
 def main():
     parser = argparse.ArgumentParser(description="PrimeFilm 1800u / 1800i Native Image Scanner")
     parser.add_argument("--offset", type=int, default=1380,
-                        help="Initial steps to advance carriage to film aperture (calibrated default: 1380 = ~19.5 mm)")
-    parser.add_argument("--lines", type=int, default=2450,
-                        help="Number of lines to scan (calibrated default: 2450 lines = 34.6 mm full 35mm frame)")
+                        help="Initial steps to advance carriage to film aperture (verified default: 1380)")
+    parser.add_argument("--lines", type=int, default=875,
+                        help="Number of lines to scan (verified physical rail limit: 875 lines)")
     parser.add_argument("--step", type=int, default=1,
                         help="Microsteps per line (default: 1)")
     parser.add_argument("--exposure", type=int, default=2900,
@@ -176,6 +176,14 @@ def main():
     parser.add_argument("--out", type=str, default="scan_output",
                         help="Output file prefix (default: scan_output)")
     args = parser.parse_args()
+
+    # Hardware rail protection: ensure carriage never exceeds physical endstop (2260 steps)
+    MAX_RAIL_STEPS = 2260
+    if args.offset + args.lines * args.step > MAX_RAIL_STEPS:
+        max_allowed_lines = (MAX_RAIL_STEPS - args.offset) // args.step
+        print(f"[!] Warning: Requested scan ({args.offset} + {args.lines}*{args.step} = {args.offset + args.lines*args.step} steps) exceeds physical rail limit ({MAX_RAIL_STEPS})!")
+        print(f"[*] Clamping to {max_allowed_lines} lines to protect carriage hardware.\n")
+        args.lines = max(1, max_allowed_lines)
 
     print("=" * 70)
     print("PRIME FILM 1800u / 1800i NATIVE HIGH-RES SCANNER")

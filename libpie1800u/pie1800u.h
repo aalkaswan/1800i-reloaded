@@ -23,7 +23,7 @@ extern "C" {
 #define PIE1800_DIR_FORWARD      0x16  // Advance into scanner bay
 #define PIE1800_DIR_BACKWARD     0x14  // Retract toward home stop
 
-#define PIE1800_MAX_TRAVEL_STEPS 6000  // Maximum physical carriage travel (~84.7 mm)
+#define PIE1800_MAX_TRAVEL_STEPS 2260  // Verified physical rail limit (~31.9 mm travel from home stop)
 
 typedef struct {
     libusb_context *ctx;
