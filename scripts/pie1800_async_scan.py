@@ -291,9 +291,10 @@ class PrimeFilmAsyncScanner:
                 asic_write(self.dev, 0x81, 0x00)
                 wait_idle(self.dev)
 
-                # 2. Reset SRAM read pointer
-                for r in [0x93, 0x94, 0x95]:
+                # 2. Reset window end & SRAM read pointer
+                for r in [0x90, 0x91, 0x92, 0x93, 0x94, 0x95]:
                     asic_write(self.dev, r, 0x00)
+                wait_idle(self.dev)
 
                 # 3. Arm GL640 DMA
                 wctl(self.dev, 0x83, 0x80)

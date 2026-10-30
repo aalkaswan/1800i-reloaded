@@ -324,10 +324,15 @@ int pie1800_scan_pipelined(pie1800_device_t *dev,
         ret = pie1800_wait_idle(dev, 5000);
         if (ret < 0) break;
 
-        // 2. Reset read pointer
+        // 2. Reset window end & read pointer
+        pie1800_reg_write(dev, 0x90, 0x00);
+        pie1800_reg_write(dev, 0x91, 0x00);
+        pie1800_reg_write(dev, 0x92, 0x00);
         pie1800_reg_write(dev, 0x93, 0x00);
         pie1800_reg_write(dev, 0x94, 0x00);
         pie1800_reg_write(dev, 0x95, 0x00);
+        ret = pie1800_wait_idle(dev, 2000);
+        if (ret < 0) break;
 
         // 3. Arm GL640 DMA
         wctl_byte(dev, 0x83, 0x80);
