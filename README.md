@@ -200,17 +200,7 @@ Comparison showing the elimination of multi-pass registration blur caused by mec
 ### I. Multi-Exposure Analog Bracketed HDR & Film Dmax Extender (Dmax > 3.8)
 By unlocking the 24-bit ASIC exposure limits (`0xa2..0xaa -> 0xff`), the integration counter is expanded to over 16 million clocks. Multi-exposure analog bracketing captures a wide dynamic range sequence at each carriage step, extracting deep shadow details through dense negative masks that are normally lost below the 14-bit ADC noise floor.
 
-#### Hardware Sensitometric Artifact Fix: Optical Black Referencing & ASIC Gate Timing
-Previous uncalibrated multi-exposure acquisitions suffered from vertical color striping caused by two physical sensor phenomena:
-1. **Lamp-OFF CDS Bias Collapse & ADC Ceiling Clamping (4095 counts)**: Turning the fluorescent lamp off for dark frames caused the CDS reference to float, clamping 96.3% of the sensels at 4095 and injecting +891-count (+42%) step discontinuities (e.g., Column 1599 $\Delta G = +115.4$).
-2. **ASIC Transfer Gate Cutoff (<2800 clocks)**: Integration times below 2800 clocks truncated the Blue channel readout gate, dumping reset voltage (~3400 counts) into Blue while Red and Green read normally.
-
-`pie1800_hdr.py` resolves this via **live dynamic optical black referencing** (extracting $V_{\text{OB}} \approx 1854$ from physical aluminum-masked sensels 10..40 on every line), safe continuous integration timing (`[2800, 3100, 3500]` clocks), and independent per-channel percentile normalization for negative film:
-
-![HDR Streak Fix Comparison Showcase](docs/images/comparison_hdr_streak_fix.png)
-
-#### Multi-Exposure Bracketed HDR Master Showcase
-Streak-free multi-exposure fusion comparing the single-exposure baseline against Debevec/Poisson linear radiance recovery (Filmic ACES tonemapped) and Mertens multi-scale exposure fusion:
+Live dynamic optical black referencing (extracting $V_{\text{OB}} \approx 1854$ from physical aluminum-masked dummy sensels 10..40 on every line) and continuous integration timing (`[2800, 3100, 3500]` clocks) ensure pristine, artifact-free multi-exposure blending:
 
 ![Multi-Exposure Analog Bracketed HDR Comparison Matrix](docs/images/comparison_bracketed_hdr.png)
 
