@@ -120,7 +120,7 @@ def auto_home(dev):
     if is_home(dev):
         return 0
     total = 0
-    while not is_home(dev) and total < 2800:
+    while not is_home(dev) and total < 6000:
         move_carriage(dev, 0x14, 50)
         total += 50
     asic_write(dev, 0x85, 0x10)
@@ -159,10 +159,10 @@ def save_ppm(filename, width, height, rgb_bytes):
 
 def main():
     parser = argparse.ArgumentParser(description="PrimeFilm 1800u / 1800i Native Image Scanner")
-    parser.add_argument("--offset", type=int, default=2000,
-                        help="Initial steps to advance carriage to film aperture (default: 2000 = ~28.2 mm)")
-    parser.add_argument("--lines", type=int, default=150,
-                        help="Number of lines to scan (default: 150 lines)")
+    parser.add_argument("--offset", type=int, default=1708,
+                        help="Initial steps to advance carriage to film aperture (default: 1708 = ~24.1 mm)")
+    parser.add_argument("--lines", type=int, default=2512,
+                        help="Number of lines to scan (default: 2512 lines = 35.45 mm full 35mm frame)")
     parser.add_argument("--step", type=int, default=1,
                         help="Microsteps per line (default: 1)")
     parser.add_argument("--exposure", type=int, default=2900,
@@ -282,9 +282,15 @@ def main():
             lines_g.append(words[2700:5400])
             lines_b.append(words[5400:8100])
 
-        def get_channel_bounds(lines):
-            flat = [p for line in lines for p in line]
-            return min(flat), max(flat)
+        def get_channel_bounds(lines, p_low=1, p_high=99):
+            sample = []
+            stride = max(1, len(lines) // 100)
+            for line in lines[::stride]:
+                sample.extend(line[::8])
+            sample.sort()
+            idx_low = int(len(sample) * p_low / 100.0)
+            idx_high = int(len(sample) * p_high / 100.0)
+            return max(sample[idx_low], 1), max(sample[idx_high], sample[idx_low] + 1)
 
         r_min, r_max = get_channel_bounds(lines_r)
         g_min, g_max = get_channel_bounds(lines_g)
