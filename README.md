@@ -1,92 +1,180 @@
 # PrimeFilm 1800i / 1800u (`05e3:0120`) Reloaded
 
-Reverse-engineering documentation, decompiled driver sources, diagnostic tools, and native Linux driver implementation for the **Pacific Image Electronics (PIE) PrimeFilm 1800i / 1800u** 35mm film scanner (`USB VID:PID 05e3:0120`).
+Complete open-source native Linux driver, SANE backend, and computational optical restoration suite for the **Pacific Image Electronics (PIE) PrimeFilm 1800i / 1800u** 35mm film scanner (`USB VID:PID 05e3:0120`).
+
+Includes full reverse-engineering documentation, decompiled Windows driver protocols, high-speed pipelined DMA acquisition, spatially-varying rod-lens deconvolution, sub-pixel super-resolution (up to 3600 DPI equivalent), CIE-LAB chroma grain-preserving denoising, and multi-exposure bracketed analog HDR.
 
 ---
 
-## 1. Executive Summary & Root Cause Analysis
+## 1. Important Disclaimers & Hardware Safety Notice
 
-### The Problem
-When running VueScan on Linux with the PrimeFilm 1800i/1800u connected, VueScan either reports that the scanner is unsupported or hangs/fails during initialization with:
-```text
-INQUIRY 12 0 0 0 24 0 -> 80005bff 0400
+> [!CAUTION]
+> **PHYSICAL CARRIAGE HARDWARE LIMITS (0 TO 2,260 STEPS)**
+> The scanner carriage mechanism is driven by a precision lead screw with a travel range of **0 to 2,260 microsteps**:
+> - **Step 0**: Calibrated optical home dock (monitored by internal sensor bit `0x84` bit 5).
+> - **Step 1,250 – 2,200**: Active 35mm film aperture scanning window (~13.4 mm travel).
+> - **Step 2,260**: **HARD MAXIMUM LIMIT**. Never command stepper motion past step 2,260. Driving the carriage beyond this limit will crash it into the physical plastic/metal endstop, risking stripped lead screw threads or motor drive gear damage.
+
+> [!WARNING]
+> **COMPULSORY STEPPER MOTOR COIL DISARMING (`0x85 -> 0x10`)**
+> The scanner's internal stepper motor driver IC (Allegro/Sanyo) keeps full current applied across the stepper motor coils whenever stepping registers are active (`0x85 = 0x16` forward, `0x14` reverse).
+> To prevent severe thermal buildup and winding degradation:
+> - The host software **MUST** disarm the motor coils by writing `0x10` (Standby / Coil Disarm) to register `0x85` whenever motor motion is finished, cancelled, or aborted on error.
+> - All drivers and scripts in this repository implement robust signal handling (`SIGINT`, `SIGTERM`, exception catchers) to guarantee `0x10` coil disarming.
+
+> [!NOTE]
+> **THIRD-PARTY REVERSE-ENGINEERED DRIVER & TRADEMARK DISCLAIMER**
+> This project is an independent, clean-room reverse-engineered open-source initiative. It is **not** manufactured, authorized, sponsored, endorsed, or affiliated with **Pacific Image Electronics Co., Ltd. (PIE)**, **Reflecta GmbH** (iScan 1800), or **Hamrick Software** (VueScan).
+> All product names, logos, and brands (e.g. *PrimeFilm*, *CyberView*, *VueScan*, *Reflecta*, *Genesys Logic*) are property of their respective owners and are used here solely for hardware identification, protocol interoperability, and documentation purposes.
+
+> [!NOTE]
+> **WARRANTY DISCLAIMER**
+> This software is distributed under the MIT License on an **"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND**, either express or implied. Controlling hardware devices via reverse-engineered protocols carries inherent risks; use with your physical equipment at your own discretion.
+
+---
+
+## 2. Quick Start & User Guide
+
+### A. System Prerequisites & Dependencies
+
+On Debian, Ubuntu, or derivative Linux distributions:
+
+```fish
+# Install system build dependencies, libusb, OpenMP, and SANE libraries
+sudo apt-get update
+sudo apt-get install -y build-essential gcc libusb-1.0-0-dev libgomp1 sane-utils libsane-dev python3 python3-pip
+
+# Install Python image processing libraries
+pip3 install numpy pillow scipy tifffile
 ```
 
-### The Root Cause
-1. **Architectural Separation in VueScan (`pie1` vs `pie2`)**:
-   - In VueScan's driver dispatch table at `0x1efa584`, entry `0xb0` maps `05e3:0120` (`PF1800U`) and entry `0xb1` maps `05e3:0129` (`PF2700`) to the **`pie1`** driver module.
-   - On **Windows**, `pie1` acts as a wrapper around the manufacturer's proprietary Windows CyberView DLLs (`ScanAce.dll` / `Twain_32.dll` / `PF1800U.dll`).
-   - On **Linux**, PIE never published Linux CyberView libraries. Ed Hamrick stubbed out `pie1.cpp` to return `0` and configured `prob_gmsg` to report:
-     > *"VueScan found PIE PF1800U, but this scanner isn't supported on this operating system."*
-   - Hamrick's native Linux driver, **`pie2.cpp`**, was developed exclusively for newer, SCSI-compliant PIE models: `05e3:0121` (PrimeFilm 1800 AFL), `3600u`, `3650u`, `7250u`.
-   - `pie2_usup` explicitly rejects the `0120` and `0129` PIDs:
-     ```cpp
-     if (pid == 0x0120 || pid == 0x0129) return 0;
-     ```
+On Arch Linux:
+```fish
+sudo pacman -S base-devel libusb sane python python-numpy python-pillow python-scipy python-tifffile
+```
 
-2. **The `80005bff 0400` Error Explained**:
-   - When `pie2_usup` is patched to force VueScan's native `pie2` SCSI engine onto the `05e3:0120`, VueScan attempts to issue a standard 6-byte SCSI INQUIRY CDB (`12 00 00 00 24 00`) via `scsi_exec` $\rightarrow$ `pies_exec`.
-   - `pies_exec` attempts to write the SCSI CDB bytes one-by-one to USB bridge register `0x85` (Genesys Logic EPP Data Register).
-   - In the GL640USB bridge architecture, writing to register `0x85` initiates an **external hardware EPP Data Strobe cycle** (`nWRITE=0`, `nDATASTB=0`) on the internal parallel bus and waits for the attached ASIC to acknowledge via `nWAIT`.
-   - Because VueScan only performed a single IEEE mode negotiation (`pies_ieee(0xe0)`) without the required line strobe sequences, the scanner ASIC remained in parallel standby and never asserted `nWAIT`, causing the USB control transfer on CDB byte 1 (`0x00`) to time out with `LIBUSB_ERROR_TIMEOUT` (`status = -7`).
-   - `pies_exec` returns `-1` (`0xff`), which `scsi_exec` packs as `0x80005b00 | (uint8_t)status` $\rightarrow$ `0x80005bff 0400`.
+### B. USB Hardware Permissions (udev rule)
 
----
+By default, Linux restricts direct USB control transfers to root. Install the provided udev rule to allow scanning without `sudo`:
 
-## 2. CyberView Protocol Breakthrough (Disassembled `PF1800U.dll`)
+```fish
+# Copy the udev rule into the system directory
+sudo cp udev/60-pie1800u.rules /etc/udev/rules.d/
 
-By extracting and disassembling the official Pacific Image CyberView driver (`PF1800U.dll`, RVA `0x10001000`–`0x10008000`), the exact proprietary ASIC communication protocol has been mapped:
+# Reload and apply udev rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
 
-### A. The 3-Stage IEEE 1284.4 Handshake (`0x10001ed0`)
-The scanner ASIC requires a strict 3-stage handshake with explicit line strobe toggling (`0x87`) to transition the parallel bus into active EPP Data Mode:
-1. **Stage 1 (Mode 0x30)**: Line strobe reset (`wctl(0x87, 0x04)` twice), followed by signature sync (`0xFF 0xAA 0x55 0x00 0xFF 0x87 0x78` to `0x88`), negotiation byte `0x30`, strobe pulse (`wctl(0x87, 0x05)` $\rightarrow$ `0x04`), and handshake confirm (`0xFF` to `0x88`).
-2. **Stage 2 (Mode 0x00)**: Repeats the signature sync with mode `0x00` and strobe pulse.
-3. **Stage 3 (Mode 0x80 - EPP Mode)**: Repeats the signature sync with mode `0x80` (EPP Data Mode) and strobe pulse.
+Verify that your scanner is recognized on the USB bus:
+```fish
+lsusb -d 05e3:0120
+# Expected output: Bus 001 Device 014: ID 05e3:0120 Genesys Logic, Inc. GL640USB Scanner Bridge
+```
 
-### B. Direct ASIC Register Architecture
-Once EPP Mode `0x80` is established, the host reads and writes the scanner ASIC registers directly through the GL640USB bridge:
-- **Write Register** (`0x10002140`): `wctl(0x83, asic_reg)` $\rightarrow$ `wctl(0x85, value)`
-- **Read Register** (`0x100021d0`): `wctl(0x83, asic_reg)` $\rightarrow$ `rctl(0x84)`
+### C. Building the Suite
 
-### C. Mapped ASIC Register Map
-| ASIC Register | Function | Description |
+A top-level Makefile is provided to build all native C libraries, high-performance OpenMP processing engines, and the SANE backend in one step:
+
+```fish
+# Build C acceleration engines (bin/), native library (libpie1800u), and SANE backend
+make
+```
+
+### D. Recommended Scanning Profiles (Best Settings)
+
+All commands are fully automated, performing carriage positioning, calibration, scanning, post-processing, and safe motor disarming.
+
+#### 1. Archival Master Negative Scan (Recommended Best Setting)
+*Captures 4 temporal exposures per line to cut ADC quantization noise by 50%, applies analog blue exposure balancing for the orange mask, executes rod-lens LCA deconvolution, and applies decoupled CIE-LAB chroma grain-preserving denoising:*
+```fish
+python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-balance --negative --deconvolve --chroma-denoise --out scan_master
+```
+*Outputs: `<out>.png` (8-bit sRGB master), `<out>_linear16.tif` (16-bit linear uncompressed TIFF master).*
+
+#### 2. Fast Everyday Negative Scan (Pipelined DMA + Optical Deconvolution)
+*High-speed pipelined acquisition (~11.7 lines/s) with optical MTF deconvolution and chroma cleaning:*
+```fish
+python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --negative --deconvolve --chroma-denoise --out scan_everyday
+```
+
+#### 3. Bracketed Multi-Exposure Analog HDR Scan ($D_{\text{max}} > 3.8$)
+*Captures 3 continuous-integration exposure brackets (`[2800, 3100, 3500]` clocks) per line with dynamic optical black clamping, outputting both Mertens contrast fusion and Filmic ACES linear radiance tone-mapping:*
+```fish
+python3 scripts/pie1800_hdr.py --offset 1250 --lines 950 --brackets 2800,3100,3500 --fusion both --tonemap filmic --negative --out scan_hdr_master
+```
+
+#### 4. 3600 DPI Computational Super-Resolution (4-Pass IBP-TV / Drizzle)
+*Performs 4 automated passes over the film frame, measuring micro-stepping carriage hysteresis ($\pm 0.02\text{ px}$) to reconstruct true 3600 DPI optical detail using Iterative Back-Projection with Total Variation:*
+```fish
+python3 scripts/pie1800_superres.py --scan 4 --lines 950 --method ibp --scale 2 --metrics --out scan_3600dpi
+```
+
+#### 5. Unprocessed 16-Bit Linear RAW for Negative Lab Pro / Darktable
+*Outputs unadjusted 16-bit linear RGB TIFF files with 4× temporal averaging and analog blue balancing, perfect for external inversion tools:*
+```fish
+python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-balance --linear16 --out scan_raw_master
+```
+
+### E. CLI Reference Table
+
+| Flag | Default | Description |
 | :--- | :--- | :--- |
-| `0x81` | Motor Step Count | 8-bit integer down-counter for stepper motor pulses (`1..255`) |
-| `0x83` | EPP Address / Trigger | Selects target ASIC internal register or triggers single-step (`0x01`) |
-| `0x84` | EPP Data IN / Status | Read ASIC register; Bit 3 (`0x08`) = Motor Busy, Bit 5 (`0x20`) = Carriage Home |
-| `0x85` | EPP Data OUT / Motor Mode | Write ASIC register / Motor control: `0x16`=Forward full-step, `0x17`=Forward half-step, `0x14`=Backward, `0x10`=Standby, `0x12`=Exposure trigger, `0x30`=Lamp ON |
-| `0x86` | Status / Ready | Carriage home sensor & hardware ready status |
-| `0x87` | Line Strobe | EPP hardware line control (`0x04` = normal, `0x05` = strobe) |
-| `0x88` | Handshake | IEEE 1284.4 mode negotiation register |
-| `0x90..0x92` | Window End | 24-bit scanline length / limit |
-| `0x93..0x95` | Window Start | 24-bit scan window start position |
-| `0x98, 0x99` | CCD Pixel Start | Horizontal CCD sampling window start clock (`0x0001` = 1) |
-| `0x9a, 0x9b` | CCD Pixel End & Binning | Horizontal CCD window end clock (`0x0a8d` = 2701) + Decimation flags in `0x9b` bits 5-7 (`0x00`=1800 DPI, `0x20`=900 DPI, `0x40`=600 DPI, `0x80`=300 DPI, `0xc0`=150 DPI) |
-| `0x9c, 0x9d` | Red Exposure | Red channel CCD integration time (LSB, MSB) |
-| `0x9e, 0x9f` | Green Exposure | Green channel CCD integration time (LSB, MSB) |
-| `0xa0, 0xa1` | Blue Exposure | Blue channel CCD integration time (LSB, MSB) |
-| `0xe0` | Red Gain | Analog Front End (AFE) PGA amplifier gain (Red) |
-| `0xe2` | Red Offset | AFE DAC black-level clamp offset (Red) |
-| `0xe4` | Green Gain | Analog Front End (AFE) PGA amplifier gain (Green) |
-| `0xe6` | Green Offset | AFE DAC black-level clamp offset (Green) |
-| `0xe8` | Blue Gain | Analog Front End (AFE) PGA amplifier gain (Blue) |
-| `0xea` | Blue Offset | AFE DAC black-level clamp offset (Blue) |
+| `--offset` | `1250` | Microsteps from home dock to 35mm film aperture window. |
+| `--lines` | `950` | Number of motor lines to scan (950 steps = full 35mm frame). |
+| `--aspect` | `2` | Motor-to-optical aspect ratio multiplier (2× gives calibrated square pixels). |
+| `--mode` | `pipelined` | Engine mode: `pipelined` (fast double-buffered DMA) or `sync` (legacy). |
+| `--samples` | `1` | Multi-exposure temporal stacking ($N$ exposures averaged per line). |
+| `--analog-balance` | `False` | Asymmetric integration times (1.75× Blue boost) to balance dense orange mask. |
+| `--negative` | `False` | Inverts RGB channels for color or B&W negative film. |
+| `--deconvolve` | `False` | Spatially-varying Richardson-Lucy optical deconvolution to remove rod-lens blur. |
+| `--chroma-denoise` | `False` | CIE-LAB decoupled chroma denoiser (eliminates color confetti; 100% grain intact). |
+| `--linear16` | `True` | Exports uncompressed 16-bit linear RGB TIFF master (`<out>_linear16.tif`). |
+| `--gain` | `31` | Analog Front End (AFE) PGA amplifier gain (`0x1f`). |
+| `--out` | `scan_output`| Output filename prefix for generated images and metadata. |
 
-### D. Bulk Image Line Acquisition & Sensor Architecture
-Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of **16,200 bytes** (`0x3F48`) triggered by writing the transfer descriptor to register `0x82`:
-- **Sensor geometry**: 2,700 physical optical pixels across the 1.5-inch active aperture at 1,800 DPI.
-- **Color format**: Interleaved RGB triplets (R, G, B, R, G, B...).
-- **Bit depth**: 14-bit linear ADC packed as Little-Endian `uint16_t` words shifted left by 2 bits (`x << 2`, multiples of 4).
-- **Line buffer size**: 2,700 pixels $\times$ 3 channels $\times$ 2 bytes = **16,200 bytes** (8,100 `uint16_t` samples).
-- **CCD Sampling Gate Clocks**: Registers `0x98=0x01, 0x99=0x00, 0x9a=0x8d, 0x9b=0x2a` configure internal pixel sampling timing.
-- **Carriage Stepper Polarity**: Register `0x85 = 0x16` steps forward into film bay; `0x85 = 0x14` retracts to home dock.
+### F. SANE Backend Installation (`libsane-pie1800u`)
+
+To use the PrimeFilm 1800u with standard Linux scanning GUI software (XSane, Simple Scan, Document Scanner, `scanimage`):
+
+```fish
+# Install the backend to system SANE directory
+sudo make -C sane-backend install
+
+# Scan directly from terminal using SANE
+scanimage -d pie1800u --format=png --output sane_scan.png
+```
 
 ---
 
-## 3. Scan Quality & Resolution Restoration Showcase
+## 3. How This Project Was Developed
+
+This project was built from scratch through pair programming using **Google Antigravity** (an advanced agentic AI coding assistant) and **REA (Reverse Engineer Anything)** (a local-only reverse-engineering analysis framework), powered by state-of-the-art **Gemini large language models (Gemini 1.5 Pro / Flash)**.
+
+### Reverse-Engineering & AI Methodology
+1. **Binary Decompilation & Static Analysis**:
+   - Pacific Image never released Linux drivers for the PrimeFilm 1800u/1800i. The legacy 32-bit Windows CyberView driver packages (`PF1800U.dll`, `RawScan.dll`) and VueScan binaries were ingested and decompiled in clean-room REA environments.
+   - LLM reasoning was applied to disassemble x86 routines in `PF1800U.dll` (RVA `0x10001000`–`0x10008000`), decoding raw EPP bus accesses and register assignments.
+
+2. **Solving the 20-Year VueScan Linux Mystery (`80005bff 0400`)**:
+   - Analysis of VueScan's binary dispatch tables revealed why the scanner failed on Linux: VueScan stubbed out its Windows CyberView wrapper (`pie1.cpp`) on Linux and erroneously fell back to its native SCSI driver (`pie2.cpp`).
+   - VueScan attempted standard SCSI INQUIRY cycles over EPP Data Register `0x85`. Because the Genesys Logic GL640 bridge waits for an internal hardware handshake (`nWAIT`), writing to `0x85` without the proprietary IEEE 1284.4 negotiation caused a hardware bus freeze, returning `LIBUSB_ERROR_TIMEOUT` (`status = -7`, packed as `0x80005bff 0400`).
+
+3. **Protocol Reconstruction & Hardware Verification**:
+   - The AI agents mapped the mandatory 3-stage IEEE 1284.4 handshake sequence (`0x30 -> 0x00 -> 0x80`), AFE PGA/DAC gain-offset registers, CCD integration clock gates (`0x98..0x9b`), and the 16,200-byte bulk transfer image frame structure.
+   - Live hardware probes were synthesized and safely executed against the physical scanner, validating each register in real time without causing carriage collisions or coil overheating.
+
+4. **Computational Optics Synthesis**:
+   - **Rod-Lens PSF Modeling**: Synthesized spatially-varying Point Spread Functions and sub-pixel lateral chromatic aberration (LCA) correction to resolve the optical field curvature inherent in Selfoc rod-lens arrays.
+   - **Sub-Pixel Super-Resolution**: Characterized the mechanical lead screw hysteresis between forward and retract carriage motions, formulating OpenMP-accelerated Iterative Back-Projection (IBP-TV) and Hubble Variable-Pixel Drizzle algorithms to achieve 3600 DPI equivalent resolving power.
+   - **Bracketed Analog HDR**: Synthesized Poisson-optimal linear radiance recovery and multi-scale Mertens exposure fusion with live dynamic optical black referencing, unlocking over 10 EV of dynamic range.
+
+---
+
+## 4. Scan Quality & Resolution Restoration Showcase
 
 ### A. Full Frame 1800 DPI Scan (2,700 × 1,900 px)
-Acquired natively on Linux using `pie1800_scan.py` with the high-speed pipelined acquisition engine, Lanczos-3 aspect correction, Richardson-Lucy optical deconvolution, and CIE-LAB chroma-only grain denoising:
+Acquired natively on Linux using `pie1800_scan.py` with high-speed pipelined acquisition, Lanczos-3 aspect correction, Richardson-Lucy optical deconvolution, and CIE-LAB chroma grain denoising:
 
 ![PrimeFilm 1800u Full 1800 DPI Master Scan](docs/images/sample_scan_full.png)
 
@@ -123,7 +211,7 @@ Crop comparison demonstrating the visual impact of each interpolation and deconv
 | **4. RL Deconvolution (Strong)** | Maximum micro-contrast | Boosted edge acutance | $\sigma=1.60, 14\text{ iters}$. Ideal for ultra-fine grain film (Kodak Ektar / T-Max). |
 
 ### E. Full Frame 100% Zoom MTF Comparison
-Direct 1:1 pixel comparison across the full 950-line film frame showing the dramatic acutance recovery across fine hair, textures, and film grain boundaries:
+Direct 1:1 pixel comparison across the full 950-line film frame showing the acutance recovery across fine hair, textures, and film grain boundaries:
 
 ![100% Zoom Optical Deconvolution Comparison](docs/images/comparison_resolution_950.png)
 
@@ -151,7 +239,7 @@ Demonstration of physical carriage geometry: the scanner stepper motor advances 
 ### H. Spatially-Varying PSF Modeling & Radial Lateral Chromatic Aberration (LCA) Correction
 The PrimeFilm 1800u/1800i utilizes a **Selfoc / Gradient-Index (GRIN) rod-lens array**. Because rod lenses suffer from off-axis radial field curvature and wavelength-dependent refraction $n(\lambda)$, optical acutance drops towards the periphery ($x < 300, x > 2400$) and color channels exhibit radial lateral chromatic displacement.
 
-`pie1800_lca_deconv` implements a state-of-the-art optical reconstruction engine combining:
+`pie1800_lca_deconv` implements an optical reconstruction engine combining:
 1. **Spatially-Varying PSF Modeling**: Lens blur radius widens quadratically from center ($x \approx 1350$) to edge: $\sigma_C(x) = \sigma_{center} + \alpha \cdot \left(\frac{x - x_{mid}}{x_{mid}}\right)^2$.
 2. **Sub-Pixel Bicubic LCA Warping**: Measures and models chromatic displacement $\Delta x(r) = k_0 + k_1 r + k_3 r^3$, warping Red and Blue into alignment with Green to $<0.08$ pixel precision.
 3. **Cross-Channel Gradient Guidance**: Uses the pristine deconvolved Green channel as a joint edge-preserving prior, applying full optical MTF restoration at true boundaries while eliminating chrominance ringing and noise amplification in flat regions.
@@ -206,7 +294,7 @@ Comparison showing the elimination of multi-pass registration blur caused by mec
 
 ![Live Hardware Sub-Pixel Alignment Comparison](docs/images/comparison_live_fix.png)
 
-### J. Multi-Exposure Analog Bracketed HDR & Film Dmax Extender (Dmax > 3.8)
+### J. Multi-Exposure Analog Bracketed HDR & Film Dmax Extender ($D_{\text{max}} > 3.8$)
 By unlocking the 24-bit ASIC exposure limits (`0xa2..0xaa -> 0xff`), the integration counter is expanded to over 16 million clocks. Multi-exposure analog bracketing captures a wide dynamic range sequence at each carriage step, extracting deep shadow details through dense negative masks that are normally lost below the 14-bit ADC noise floor.
 
 Live dynamic optical black referencing (extracting $V_{\text{OB}} \approx 1854$ from physical aluminum-masked dummy sensels 10..40 on every line) and continuous integration timing (`[2800, 3100, 3500]` clocks) ensure pristine, artifact-free multi-exposure blending:
@@ -222,40 +310,133 @@ Live dynamic optical black referencing (extracting $V_{\text{OB}} \approx 1854$ 
 
 ---
 
-## 4. Repository Layout
+## 5. Reverse-Engineering & Protocol Breakdown
+
+### A. Root Cause Analysis of the VueScan Linux Failure
+
+1. **Architectural Separation in VueScan (`pie1` vs `pie2`)**:
+   - In VueScan's driver dispatch table at `0x1efa584`, entry `0xb0` maps `05e3:0120` (`PF1800U`) and entry `0xb1` maps `05e3:0129` (`PF2700`) to the **`pie1`** driver module.
+   - On **Windows**, `pie1` acts as a wrapper around the manufacturer's proprietary Windows CyberView DLLs (`ScanAce.dll` / `Twain_32.dll` / `PF1800U.dll`).
+   - On **Linux**, PIE never published Linux CyberView libraries. Ed Hamrick stubbed out `pie1.cpp` to return `0` and configured `prob_gmsg` to report:
+     > *"VueScan found PIE PF1800U, but this scanner isn't supported on this operating system."*
+   - Hamrick's native Linux driver, **`pie2.cpp`**, was developed exclusively for newer, SCSI-compliant PIE models: `05e3:0121` (PrimeFilm 1800 AFL), `3600u`, `3650u`, `7250u`.
+   - `pie2_usup` explicitly rejects the `0120` and `0129` PIDs:
+     ```cpp
+     if (pid == 0x0120 || pid == 0x0129) return 0;
+     ```
+
+2. **The `80005bff 0400` Error Explained**:
+   - When `pie2_usup` is patched to force VueScan's native `pie2` SCSI engine onto the `05e3:0120`, VueScan attempts to issue a standard 6-byte SCSI INQUIRY CDB (`12 00 00 00 24 00`) via `scsi_exec` $\rightarrow$ `pies_exec`.
+   - `pies_exec` attempts to write the SCSI CDB bytes one-by-one to USB bridge register `0x85` (Genesys Logic EPP Data Register).
+   - In the GL640USB bridge architecture, writing to register `0x85` initiates an **external hardware EPP Data Strobe cycle** (`nWRITE=0`, `nDATASTB=0`) on the internal parallel bus and waits for the attached ASIC to acknowledge via `nWAIT`.
+   - Because VueScan only performed a single IEEE mode negotiation (`pies_ieee(0xe0)`) without the required line strobe sequences, the scanner ASIC remained in parallel standby and never asserted `nWAIT`, causing the USB control transfer on CDB byte 1 (`0x00`) to time out with `LIBUSB_ERROR_TIMEOUT` (`status = -7`).
+   - `pies_exec` returns `-1` (`0xff`), which `scsi_exec` packs as `0x80005b00 | (uint8_t)status` $\rightarrow$ `0x80005bff 0400`.
+
+### B. The Proprietary CyberView ASIC Protocol (`PF1800U.dll`)
+
+By extracting and disassembling the official Pacific Image CyberView driver (`PF1800U.dll`, RVA `0x10001000`–`0x10008000`), the exact proprietary ASIC communication protocol was mapped:
+
+#### 1. The 3-Stage IEEE 1284.4 Handshake (`0x10001ed0`)
+The scanner ASIC requires a strict 3-stage handshake with explicit line strobe toggling (`0x87`) to transition the parallel bus into active EPP Data Mode:
+1. **Stage 1 (Mode 0x30)**: Line strobe reset (`wctl(0x87, 0x04)` twice), followed by signature sync (`0xFF 0xAA 0x55 0x00 0xFF 0x87 0x78` to `0x88`), negotiation byte `0x30`, strobe pulse (`wctl(0x87, 0x05)` $\rightarrow$ `0x04`), and handshake confirm (`0xFF` to `0x88`).
+2. **Stage 2 (Mode 0x00)**: Repeats the signature sync with mode `0x00` and strobe pulse.
+3. **Stage 3 (Mode 0x80 - EPP Mode)**: Repeats the signature sync with mode `0x80` (EPP Data Mode) and strobe pulse.
+
+#### 2. Direct ASIC Register Architecture
+Once EPP Mode `0x80` is established, the host reads and writes the scanner ASIC registers directly through the GL640USB bridge:
+- **Write Register** (`0x10002140`): `wctl(0x83, asic_reg)` $\rightarrow$ `wctl(0x85, value)`
+- **Read Register** (`0x100021d0`): `wctl(0x83, asic_reg)` $\rightarrow$ `rctl(0x84)`
+
+#### 3. Mapped ASIC Register Table
+| ASIC Register | Function | Description |
+| :--- | :--- | :--- |
+| `0x81` | Motor Step Count | 8-bit integer down-counter for stepper motor pulses (`1..255`) |
+| `0x83` | EPP Address / Trigger | Selects target ASIC internal register or triggers single-step (`0x01`) |
+| `0x84` | EPP Data IN / Status | Read ASIC register; Bit 3 (`0x08`) = Motor Busy, Bit 5 (`0x20`) = Carriage Home |
+| `0x85` | EPP Data OUT / Motor Mode | Write ASIC register / Motor control: `0x16`=Forward full-step, `0x17`=Forward half-step, `0x14`=Backward, `0x10`=Standby, `0x12`=Exposure trigger, `0x30`=Lamp ON |
+| `0x86` | Status / Ready | Carriage home sensor & hardware ready status |
+| `0x87` | Line Strobe | EPP hardware line control (`0x04` = normal, `0x05` = strobe) |
+| `0x88` | Handshake | IEEE 1284.4 mode negotiation register |
+| `0x90..0x92` | Window End | 24-bit scanline length / limit |
+| `0x93..0x95` | Window Start | 24-bit scan window start position |
+| `0x98, 0x99` | CCD Pixel Start | Horizontal CCD sampling window start clock (`0x0001` = 1) |
+| `0x9a, 0x9b` | CCD Pixel End & Binning | Horizontal CCD window end clock (`0x0a8d` = 2701) + Decimation flags in `0x9b` bits 5-7 (`0x00`=1800 DPI, `0x20`=900 DPI, `0x40`=600 DPI, `0x80`=300 DPI, `0xc0`=150 DPI) |
+| `0x9c, 0x9d` | Red Exposure | Red channel CCD integration time (LSB, MSB) |
+| `0x9e, 0x9f` | Green Exposure | Green channel CCD integration time (LSB, MSB) |
+| `0xa0, 0xa1` | Blue Exposure | Blue channel CCD integration time (LSB, MSB) |
+| `0xe0` | Red Gain | Analog Front End (AFE) PGA amplifier gain (Red) |
+| `0xe2` | Red Offset | AFE DAC black-level clamp offset (Red) |
+| `0xe4` | Green Gain | Analog Front End (AFE) PGA amplifier gain (Green) |
+| `0xe6` | Green Offset | AFE DAC black-level clamp offset (Green) |
+| `0xe8` | Blue Gain | Analog Front End (AFE) PGA amplifier gain (Blue) |
+| `0xea` | Blue Offset | AFE DAC black-level clamp offset (Blue) |
+
+#### 4. Bulk Image Line Acquisition & Sensor Architecture
+Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of **16,200 bytes** (`0x3F48`) triggered by writing the transfer descriptor to register `0x82`:
+- **Sensor geometry**: 2,700 physical optical pixels across the 1.5-inch active aperture at 1,800 DPI.
+- **Color format**: Interleaved RGB triplets (R, G, B, R, G, B...).
+- **Bit depth**: 14-bit linear ADC packed as Little-Endian `uint16_t` words shifted left by 2 bits (`x << 2`, multiples of 4).
+- **Line buffer size**: 2,700 pixels $\times$ 3 channels $\times$ 2 bytes = **16,200 bytes** (8,100 `uint16_t` samples).
+- **CCD Sampling Gate Clocks**: Registers `0x98=0x01, 0x99=0x00, 0x9a=0x8d, 0x9b=0x2a` configure internal pixel sampling timing.
+- **Carriage Stepper Polarity**: Register `0x85 = 0x16` steps forward into film bay; `0x85 = 0x14` retracts to home dock.
+
+---
+
+## 6. Repository Layout
 
 ```text
 1800i-reloaded/
-├── README.md                      # This documentation
-├── cyberview_protocol.md          # Technical disassembly analysis of PF1800U.dll
-├── docs/images/                   # Sample scans and comparison documentation assets
+├── Makefile                       # Top-level build system (bin/, libpie1800u, sane-backend)
+├── README.md                      # Comprehensive user documentation & technical report
+├── cyberview_protocol.md          # Disassembly notes & raw register traces from PF1800U.dll
+├── udev/
+│   └── 60-pie1800u.rules          # Udev permission rules for non-root USB access
+├── bin/                           # Compiled C engines and acceleration libraries
+│   ├── pie1800_lca_deconv         # Standalone OpenMP spatially-varying LCA deconvolution binary
+│   ├── libpie1800_lca_deconv.so   # Shared library for Python ctypes binding
+│   ├── pie1800_chroma_denoise     # Standalone OpenMP CIE-LAB chroma grain denoiser binary
+│   ├── libpie1800_chroma_denoise.so# Shared library for Python ctypes binding
+│   ├── pie1800_superres           # Standalone OpenMP IBP-TV & Drizzle super-resolution binary
+│   └── pie1800_deconv             # Classic Richardson-Lucy optical deconvolution binary
+├── docs/images/                   # Photographic evidence & side-by-side comparison matrix
+│   ├── comparison_negative_settings.png # 4-way negative scanning & conversion comparison
+│   ├── comparison_fast_pipeline.png     # Pipelined acquisition through restoration stages
+│   ├── comparison_enhancement_matrix.png# Deconvolution acutance matrix
+│   ├── comparison_chroma_denoise.png    # Chroma-only grain preservation showcase
+│   ├── comparison_aspect_ratio.png      # Motor pitch vs optical sensor calibration
+│   ├── comparison_lca_deconv.png        # Spatially-varying rod-lens LCA deconvolution
+│   ├── comparison_lca_deconv_ultimate.png# Full-frame 35mm master photograph LCA comparison
+│   ├── comparison_superresolution_matrix.png# 3600 DPI super-resolution comparison
+│   ├── comparison_superres_techniques.png# IBP-TV vs Variable-Pixel Drizzle comparison
+│   ├── comparison_live_fix.png          # Mechanical hysteresis registration comparison
+│   ├── comparison_bracketed_hdr.png     # Multi-exposure bracketed analog HDR comparison
+│   └── sample_scan_full.png             # Full 2,700 x 1,900 px 1800 DPI master scan
 ├── libpie1800u/                   # Standalone native C driver library
-│   ├── pie1800u.h                 # Driver API header
-│   ├── pie1800u.c                 # libusb-1.0 hardware implementation
+│   ├── pie1800u.h                 # C API header
+│   ├── pie1800u.c                 # Low-level libusb-1.0 hardware implementation
 │   ├── pie1800_cli.c              # Lightweight C acquisition CLI
 │   └── Makefile                   # Builds libpie1800u.so, libpie1800u.a, pie1800_cli
 ├── sane-backend/                  # SANE scanner backend (sane-pie1800u)
 │   ├── sane-pie1800u.h            # SANE API interface & types
-│   ├── sane-pie1800u.c            # SANE backend driver implementation
+│   ├── sane-pie1800u.c            # Double-buffered async ring buffer backend driver
 │   ├── pie1800u.conf              # SANE daemon device configuration
-│   └── Makefile                   # Builds libsane-pie1800u.so.1
+│   └── Makefile                   # Builds and installs libsane-pie1800u.so.1
 ├── scripts/
-│   ├── pie1800_scan.py            # High-resolution image scanner with auto-positioning, multi-exposure & PNG/TIFF export
-│   ├── pie1800_async_scan.py      # High-speed asynchronous pipelined scanner & benchmark tool
-│   ├── pie1800_lca_deconv.c       # High-performance C engine: Spatially-varying PSF, LCA registration & Guided RL
-│   ├── pie1800_lca_deconv.py      # Python CLI, optical profiler, and ctypes binding accelerator
-│   ├── pie1800_superres.c         # High-performance OpenMP C engine: Sub-pixel NCC, IBP-TV & Drizzle reconstruction
-│   ├── pie1800_superres.py        # Python CLI & super-resolution pipeline with synthetic jitter & 16-bit TIFF export
-│   ├── pie1800_deconv.c           # Classic C Richardson-Lucy optical MTF deconvolution engine
-│   ├── pie1800_chroma_denoise.c   # High-performance C CIE-LAB & YCbCr chroma-only grain-preserving denoiser
-│   ├── pie1800_chroma_denoise.py  # Python chroma denoiser CLI & ctypes accelerator bindings
-│   ├── generate_chroma_comparison.py # Side-by-side zoom comparison generator
-│   ├── test_full_line_16200.py    # 16,200-byte 16-bit uint16 optical line readout benchmark
-│   ├── test_sram_read.py          # CCD sampling gate & dark vs light modulation test
-│   ├── interactive_jog_and_scan.py# Interactive carriage jogger & optical test console
-│   ├── test_motor_jog.py          # Stepper motor distance & speed verification
-│   ├── test_cyberview_asic.py     # Live hardware ASIC register reader & 3-stage handshake
-│   └── 60-vuescan.rules           # Udev rule for non-root USB access
+│   ├── pie1800_scan.py            # High-resolution scanner CLI (pipelined DMA, HDR, deconv, chroma)
+│   ├── pie1800_hdr.py             # Multi-exposure analog bracketed HDR engine
+│   ├── pie1800_superres.py        # Sub-pixel super-resolution pipeline (IBP-TV, Drizzle)
+│   ├── pie1800_superres.c         # High-performance OpenMP C super-resolution engine
+│   ├── pie1800_lca_deconv.py      # Python LCA deconvolution CLI & ctypes wrapper
+│   ├── pie1800_lca_deconv.c       # High-performance OpenMP C rod-lens LCA engine
+│   ├── pie1800_chroma_denoise.py  # Python chroma denoiser CLI & ctypes wrapper
+│   ├── pie1800_chroma_denoise.c   # High-performance OpenMP C chroma denoiser engine
+│   ├── pie1800_deconv.c           # Classic C Richardson-Lucy deconvolution engine
+│   ├── generate_negative_settings_comparison.py # Generates 4-way comparison image
+│   ├── generate_superres_comparison.py # Generates super-resolution comparison images
+│   ├── generate_hdr_comparison.py # Generates bracketed HDR comparison images
+│   ├── generate_chroma_comparison.py # Generates chroma denoise comparison images
+│   ├── calibrate_frame.py         # Aperture window discovery and motor calibration
+│   └── test_pie1800_hdr.py        # Automated test suite for HDR radiance fusion
 └── windows_driver/                # Extracted official Pacific Image CyberView components
     ├── PF1800U.dll                # Core hardware driver DLL (exports ScannerDeviceIO)
     ├── RawScan.dll                # Image post-processing & RGB conversion DLL
@@ -268,155 +449,10 @@ Live dynamic optical black referencing (extracting $V_{\text{OB}} \approx 1854$ 
 
 ---
 
-## 5. Hardware Acquisition & Scanning
+## 7. License & Acknowledgements
 
-### Calibrated Physical Geometry
-- **Home Dock**: Step `0` (closed-loop monitored by optical sensor register `0x84` bit 5).
-- **Aperture Offset**: Step `1250` (~17.6 mm from dock to leading edge of 35mm film window).
-- **Frame Length**: `950 lines` (~13.4 mm travel, safely ending at step `2200`).
-- **Hardware Rail Ceiling**: Hard-clamped at step `2260` to prevent mechanical stop collision.
-- **Aspect Scaling**: $2\times$ vertical expansion matches the 900 DPI motor pitch to the 1800 DPI optical CCD sensor ($2700 \times 1900$ square pixels, standard 3:2 photographic aspect ratio).
-
-### Scanning Profiles
-
-#### 1. Archival Master Scan (Multi-Exposure 4× + Analog Balance + Deconvolution + Chroma Denoise + 16-Bit TIFF)
-```fish
-python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-balance --negative --deconvolve --chroma-denoise --out scan_master
-```
-
-#### 2. Everyday Fast Scan (Deconvolved & Chroma Cleaned)
-```fish
-python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --negative --deconvolve --chroma-denoise --out scan_everyday
-```
-
-#### 3. Standalone Chroma Denoising (Fast C Engine)
-```fish
-# Python CLI (PNG / PPM / TIF)
-python3 scripts/pie1800_chroma_denoise.py scan_master_deconv.png scan_master_clean.png --radius 5 --strength 12.0 --colorspace lab
-
-# Direct C Binary (PPM)
-./bin/pie1800_chroma_denoise scan_master_deconv.ppm scan_master_clean.ppm 5 12.0 lab bilateral
-```
-
-#### 4. Standalone Spatially-Varying LCA & Guided Deconvolution (Fast C Engine)
-```fish
-# Python CLI (supports PNG, PPM, TIFF) with optical profiling and comparison generator
-python3 scripts/pie1800_lca_deconv.py scan_master_scaled.ppm scan_master_enhanced.png --profile --compare docs/images/comparison_lca_deconv.png
-
-# Direct High-Performance Multi-Core OpenMP C Binary
-./bin/pie1800_lca_deconv scan_master_scaled.ppm scan_master_enhanced.ppm --iters 8
-```
-
-#### 5. High-Speed Asynchronous Pipelined Scan
-Pipelined scanning with background producer-consumer deplanarization and low-latency hardware polling is now the **default engine across all modes** in `pie1800_scan.py`:
-```fish
-# Fast pipelined scan (default)
-python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --negative --aspect 2 --out scan_fast
-
-# Benchmark sync vs pipelined throughput directly on live hardware
-python3 scripts/pie1800_scan.py --benchmark --lines 30
-
-# Optional fallback to legacy synchronous mode
-python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --sync --out scan_sync
-```
-
-#### 6. RAW 16-Bit Linear Master for External Grading (Negative Lab Pro / Darktable)
-```fish
-python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-balance --linear16 --out scan_raw_master
-```
-
-#### 7. Multi-Pass Sub-Pixel Super-Resolution (3600 DPI Equivalent)
-Acquires or combines multiple passes over the film aperture, registering microscopic sub-pixel shifts from carriage hysteresis to double vertical spatial resolution via Iterative Back-Projection (IBP) or Drizzle:
-```fish
-# 1. Super-resolve your existing master scan (uses sub-pixel jitter simulation)
-python3 scripts/pie1800_superres.py scan_fast_clean_scaled.ppm --simulate 4 --method ibp --scale 2 --metrics --out master_3600dpi
-
-# 2. Or acquire 4 live physical passes directly from the scanner (automated carriage re-docking & hysteresis)
-python3 scripts/pie1800_superres.py --scan 4 --lines 950 --out scan_superres_3600dpi
-
-# 3. Super-resolve multiple existing passes captured from disk
-python3 scripts/pie1800_superres.py pass1.ppm pass2.ppm pass3.ppm pass4.ppm --method ibp --scale 2 --metrics --out scan_superres_3600dpi
-
-# 4. Drizzle variable-pixel linear reconstruction
-python3 scripts/pie1800_superres.py scan_fast_clean_scaled.ppm --simulate 4 --method drizzle --pixfrac 0.7 --metrics --out scan_drizzle_3600dpi
-
-# 5. Direct high-performance OpenMP C binary execution
-PIE_SCALE=2 PIE_ITERS=8 ./bin/pie1800_superres output_superres.ppm ibp pass1.ppm pass2.ppm pass3.ppm pass4.ppm
-```
-
-#### 8. Multi-Exposure Analog Bracketed HDR (Live Hardware)
-Captures multi-bracket exposure sequences on live hardware (`0x9c..0xa1`), using dynamic optical black referencing and safe continuous integration timing before Poisson-optimal linear radiance recovery and Mertens exposure fusion:
-```fish
-# 3-Bracket Clean Streak-Free HDR Scan (2800, 3100, 3500 clocks) with Filmic ACES + Mertens Fusion
-python3 scripts/pie1800_hdr.py --offset 1250 --lines 950 --brackets 2800,3100,3500 --fusion both --tonemap filmic --negative --out scan_hdr_master_clean
-
-# Extended 4-Bracket Scan with Guided Optical Deconvolution & Chroma Denoising
-python3 scripts/pie1800_hdr.py --offset 1250 --lines 950 --brackets 2800,3100,3400,3800 --deconvolve --chroma-denoise --negative --out scan_hdr_ultra
-
-# Offline validation & unit test suite
-python3 scripts/test_pie1800_hdr.py
-```
-
-### Command-Line Arguments Reference
-
-| Flag | Default | Description |
-| :--- | :--- | :--- |
-| `--mode` | `pipelined`| Scan engine: `pipelined` (fast double-buffered DMA + threaded pipeline), `sync` (legacy), or `benchmark`. |
-| `--sync` | — | Shortcut to force legacy synchronous acquisition. |
-| `--benchmark` | — | Runs side-by-side benchmark comparing Synchronous vs Pipelined throughput on hardware. |
-| `--offset` | `1250` | Microsteps to advance carriage to film aperture (~17.6 mm). |
-| `--lines` | `950` | Total motor scanlines (950 steps covers a full 35mm frame). |
-| `--aspect` | `2` | Vertical aspect ratio scaling multiplier (2× gives true 1800 DPI square pixels). |
-| `--samples` | `1` | Multi-exposure temporal stacking ($N$ exposures averaged per line to cut noise by $\sqrt{N}$). |
-| `--analog-balance`| `False`| Asymmetric integration times (1.75× Blue boost) to balance dense orange negative mask. |
-| `--deconvolve` | `False`| Richardson-Lucy optical MTF deconvolution to restore rod lens sharpness. |
-| `--deconv-sigma` | `1.25` | Point Spread Function (PSF) blur radius for optical deconvolution. |
-| `--deconv-iters` | `8` | Iteration count for Richardson-Lucy deconvolution. |
-| `--chroma-denoise` | `False`| Decoupled chroma-only grain-preserving denoiser (eliminates sensor color noise). |
-| `--chroma-radius` | `5` | Spatial filter radius in pixels for chrominance channels. |
-| `--chroma-strength`| `12.0` | Range filter strength for chrominance edge preservation. |
-| `--chroma-space` | `lab` | Decoupled color space: `lab` (CIE-LAB perceptual) or `ycbcr`. |
-| `--chroma-filter`| `bilateral`| Filter algorithm: `bilateral` (edge-preserving) or `guided` ($O(1)$ fast). |
-| `--linear16` | `True` | Exports uncompressed 16-bit linear RGB TIFF master (`<out>_linear16.tif`). |
-| `--negative` | `False`| Inverts RGB data for color negative film. |
-| `--gain` | `31` | Analog Front End (AFE) PGA gain (`0x1f`). |
-| `--out` | `scan_output`| Output filename prefix for `.png`, `.ppm`, `.tif`, and `_raw16.bin`. |
-
----
-
-## 6. Building the Native C Driver & SANE Backend
-
-### Native C Driver Library
-```fish
-cd libpie1800u
-make
-
-# High-speed pipelined double-buffered scan (default)
-./pie1800_cli 950 1250 c_scan_output.ppm
-
-# Legacy synchronous scan
-./pie1800_cli 950 1250 c_scan_output.ppm --sync
-```
-
-#### C Pipelined API
-```c
-#include "pie1800u.h"
-
-// Double-buffered async line delivery via callback
-int on_line(void *user_data, int line_idx, const uint16_t *line_buffer) {
-    // Process 8,100 uint16_t RGB samples (16,200 bytes)
-    return 0; // Return 0 to continue, non-zero to cancel
-}
-
-pie1800_scan_pipelined(dev, 950, 1, on_line, NULL);
-```
-
-### SANE Backend Installation
-The SANE backend (`libsane-pie1800u.so.1`) features a multithreaded double-buffered ring buffer that decouples frontend client read calls from hardware USB bulk DMA, allowing continuous high-speed scanning without motor start-stop stutter.
-
-```fish
-cd sane-backend
-make
-sudo make install
-scanimage -d pie1800u --format=png --output sane_scan.png
-```
+- **License**: Released under the [MIT License](LICENSE).
+- **Acknowledgements**:
+  - Developed using **Google Antigravity** and **REA (Reverse Engineer Anything)**.
+  - LLM models: **Google Gemini** (Gemini 1.5 Pro / Flash).
+  - Built with `libusb-1.0`, SANE (Scanner Access Now Easy), and OpenMP.
