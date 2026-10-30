@@ -107,6 +107,22 @@ def move_carriage(dev, direction_cmd, steps):
     # Disarm motor driver / enter standby mode
     asic_write(dev, 0x85, 0x10)
 
+def is_home(dev):
+    """Optical Home Sensor: Reg 0x84 bit 5 is 0 at home dock, 1 when away."""
+    s84 = asic_read(dev, 0x84)
+    return s84 is not None and (s84 & 0x20) == 0
+
+def auto_home(dev):
+    """Closed-loop optical homing: stops the instant the sensor detects home."""
+    if is_home(dev):
+        return 0
+    total = 0
+    while not is_home(dev) and total < 2800:
+        move_carriage(dev, 0x14, 50)
+        total += 50
+    asic_write(dev, 0x85, 0x10)
+    return total
+
 def capture_line_16bit(dev):
     asic_write(dev, 0x85, 0x12)
     asic_write(dev, 0x81, 0x00)
@@ -180,10 +196,13 @@ def main():
     cyberview_init(dev)
     configure_hardware(dev)
 
-    if args.home_first:
-        print("[*] Homing carriage backward to dock (500 steps)...")
-        move_carriage(dev, 0x14, 500)
-        print("[+] Homing nudge complete.")
+    # Optical Home Sensor Check
+    if is_home(dev):
+        print("[+] Optical Home Sensor: Carriage is currently docked at HOME (Step 0).")
+    else:
+        print("[*] Optical Home Sensor: Carriage is out in the bay. Homing to sensor...")
+        retracted = auto_home(dev)
+        print(f"[+] Homing complete (retracted {retracted} steps). Docked at HOME.")
 
     # Fast integration (1500 clocks)
     for r_lsb, r_msb in [(0x9c, 0x9d), (0x9e, 0x9f), (0xa0, 0xa1)]:
@@ -234,10 +253,10 @@ def main():
         print(f"[+] Scan completed in {time.time() - t0:.1f}s!")
 
     finally:
-        if total_moved > 0:
-            print(f"[*] Returning carriage home ({total_moved} steps)...")
-            move_carriage(dev, 0x14, total_moved)
-            print("[+] Carriage safely docked at home stop.")
+        if total_moved > 0 or not is_home(dev):
+            print("[*] Returning carriage home via Optical Sensor...")
+            retracted = auto_home(dev)
+            print(f"[+] Carriage safely docked at home stop (retracted {retracted} steps).")
 
         print("[*] Turning LAMP OFF...")
         try:

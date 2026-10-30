@@ -179,13 +179,34 @@ int pie1800_move(pie1800_device_t *dev, uint8_t direction, int steps) {
     return 0;
 }
 
+bool pie1800_is_home(pie1800_device_t *dev) {
+    if (!dev) return false;
+    uint8_t val = 0;
+    int ret = pie1800_reg_read(dev, 0x84, &val);
+    if (ret < 0) return false;
+    // Optical Home Sensor: Bit 5 of reg 0x84 is 0 at home dock, 1 when away
+    return ((val & 0x20) == 0);
+}
+
 int pie1800_home(pie1800_device_t *dev) {
     if (!dev) return -EINVAL;
-    // Retract carriage back to dock (up to 2800 steps to guarantee mechanical dock if position was lost)
-    int steps_to_home = (dev->current_position > 0) ? dev->current_position : 2800;
-    int ret = pie1800_move(dev, PIE1800_DIR_BACKWARD, steps_to_home);
+
+    // Check optical sensor: if already at home, do nothing!
+    if (pie1800_is_home(dev)) {
+        dev->current_position = 0;
+        return 0;
+    }
+
+    // Closed-loop optical homing: retract in small 50-step chunks until sensor trips
+    int total_backed = 0;
+    while (!pie1800_is_home(dev) && total_backed < PIE1800_MAX_TRAVEL_STEPS) {
+        pie1800_move(dev, PIE1800_DIR_BACKWARD, 50);
+        total_backed += 50;
+    }
+
     dev->current_position = 0;
-    return ret;
+    pie1800_reg_write(dev, 0x85, 0x10);
+    return 0;
 }
 
 int pie1800_scan_line(pie1800_device_t *dev, uint16_t *buffer) {

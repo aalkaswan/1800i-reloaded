@@ -69,6 +69,7 @@ int pie1800_set_lamp(pie1800_device_t *dev, bool enable);
  */
 int pie1800_move(pie1800_device_t *dev, uint8_t direction, int steps);
 int pie1800_home(pie1800_device_t *dev);
+bool pie1800_is_home(pie1800_device_t *dev);
 
 /**
  * Acquire one complete optical line (16,200 bytes / 8,100 uint16_t RGB samples).

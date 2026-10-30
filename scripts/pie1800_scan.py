@@ -107,6 +107,24 @@ def move_carriage(dev, direction_cmd, steps):
         wait_idle(dev)
         remaining -= chunk
         time.sleep(0.004)
+    # Disarm motor pulses / standby mode
+    asic_write(dev, 0x85, 0x10)
+
+def is_home(dev):
+    """Optical Home Sensor: Reg 0x84 bit 5 is 0 at home dock, 1 when away."""
+    s84 = asic_read(dev, 0x84)
+    return s84 is not None and (s84 & 0x20) == 0
+
+def auto_home(dev):
+    """Closed-loop optical homing: stops the instant the sensor detects home."""
+    if is_home(dev):
+        return 0
+    total = 0
+    while not is_home(dev) and total < 2800:
+        move_carriage(dev, 0x14, 50)
+        total += 50
+    asic_write(dev, 0x85, 0x10)
+    return total
 
 def capture_line_16bit(dev):
     # Trigger optical exposure
@@ -336,10 +354,10 @@ def main():
         print(f"[+] Saved Raw 16-bit Binary Stream: {out_bin}")
 
     finally:
-        if total_steps_moved > 0:
-            print(f"\n[*] Step 6: Returning carriage back to home ({total_steps_moved} steps)...")
-            move_carriage(dev, 0x14, total_steps_moved)
-            print("[+] Carriage safely docked at home.")
+        if total_steps_moved > 0 or not is_home(dev):
+            print("\n[*] Step 6: Returning carriage home via Optical Sensor...")
+            retracted = auto_home(dev)
+            print(f"[+] Carriage safely docked at home (retracted {retracted} steps).")
 
         print("[*] Turning LAMP OFF...")
         try:
