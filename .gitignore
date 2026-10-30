@@ -7,3 +7,6 @@
 *.so*
 bin/
 pie1800_cli
+
+# Documentation images
+!docs/images/*

@@ -81,12 +81,34 @@ Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of **16,200 by
 
 ---
 
-## 3. Repository Layout
+## 3. Scan Quality & Resolution Restoration Showcase
+
+### Full Frame 1800 DPI Scan (2,700 × 1,900 px)
+Acquired natively on Linux using `pie1800_scan.py` with 4× multi-exposure temporal stacking, analog color balancing, and optical Richardson-Lucy MTF deconvolution:
+
+![PrimeFilm 1800u Full 1800 DPI Master Scan](docs/images/sample_scan_full.png)
+
+### Resolution Enhancement Comparison Matrix
+Crop comparison demonstrating the visual impact of each processing stage on film grain acutance and edge micro-contrast:
+
+![Enhancement Comparison Matrix](docs/images/comparison_enhancement_matrix.png)
+
+| Processing Stage | MTF / Grain Acutance | Dynamic Range / Noise | Description |
+| :--- | :--- | :--- | :--- |
+| **1. Baseline (Bilinear)** | Soft / Blurred | Baseline (8-bit) | Standard single-exposure capture with naive bilinear vertical scaling. |
+| **2. Lanczos-3 Sinc** | Sharp transitions | Baseline (8-bit) | Resolves motor-axis interpolation smear without introducing ringing artifacts. |
+| **3. RL Deconvolution (Standard)** | Natural film grain | Cleaned high frequencies | $\sigma=1.25, 8\text{ iters}$. Restores lens MTF loss; film grain pops into focus. |
+| **4. RL Deconvolution (Strong)** | Maximum micro-contrast | Boosted edge acutance | $\sigma=1.60, 14\text{ iters}$. Ideal for ultra-fine grain film (Kodak Ektar / T-Max). |
+
+---
+
+## 4. Repository Layout
 
 ```text
 1800i-reloaded/
 ├── README.md                      # This documentation
 ├── cyberview_protocol.md          # Technical disassembly analysis of PF1800U.dll
+├── docs/images/                   # Sample scans and comparison documentation assets
 ├── libpie1800u/                   # Standalone native C driver library
 │   ├── pie1800u.h                 # Driver API header
 │   ├── pie1800u.c                 # libusb-1.0 hardware implementation
@@ -98,7 +120,8 @@ Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of **16,200 by
 │   ├── pie1800u.conf              # SANE daemon device configuration
 │   └── Makefile                   # Builds libsane-pie1800u.so.1
 ├── scripts/
-│   ├── pie1800_scan.py            # High-resolution image scanner with auto-positioning & PNG/PPM export
+│   ├── pie1800_scan.py            # High-resolution image scanner with auto-positioning, multi-exposure & PNG/TIFF export
+│   ├── pie1800_deconv.c           # High-performance C Richardson-Lucy optical MTF deconvolution engine
 │   ├── test_full_line_16200.py    # 16,200-byte 16-bit uint16 optical line readout benchmark
 │   ├── test_sram_read.py          # CCD sampling gate & dark vs light modulation test
 │   ├── interactive_jog_and_scan.py# Interactive carriage jogger & optical test console
@@ -117,29 +140,64 @@ Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of **16,200 by
 
 ---
 
-## 4. Hardware Acquisition & Scanning
+## 5. Hardware Acquisition & Scanning
 
-### A. Scanning Full Images with Python
-To acquire a high-resolution scan (e.g. 150 lines starting at aperture offset):
+### Calibrated Physical Geometry
+- **Home Dock**: Step `0` (closed-loop monitored by optical sensor register `0x84` bit 5).
+- **Aperture Offset**: Step `1250` (~17.6 mm from dock to leading edge of 35mm film window).
+- **Frame Length**: `950 lines` (~13.4 mm travel, safely ending at step `2200`).
+- **Hardware Rail Ceiling**: Hard-clamped at step `2260` to prevent mechanical stop collision.
+- **Aspect Scaling**: $2\times$ vertical expansion matches the 900 DPI motor pitch to the 1800 DPI optical CCD sensor ($2700 \times 1900$ square pixels, standard 3:2 photographic aspect ratio).
+
+### Scanning Profiles
+
+#### 1. Archival Master Scan (Multi-Exposure 4× + Analog Balance + Deconvolution + 16-Bit TIFF)
 ```fish
-python3 ~/Desktop/1800i-reloaded/scripts/pie1800_scan.py --offset 2000 --lines 150 --out test_scan
+python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-balance --negative --deconvolve --out scan_master
 ```
-Options:
-- `--offset <steps>`: Advance carriage to active film holder (default: 2000 steps = ~28.2 mm).
-- `--lines <N>`: Number of lines to scan (e.g. 1800 lines for a full 1-inch frame).
-- `--negative`: Invert colors for color negative film.
-- `--out <name>`: Base filename for output `.png`, `.ppm`, and `_raw16.bin`.
 
-### B. Building & Running the Native C Driver Library
+#### 2. Everyday Fast Scan (Deconvolved)
 ```fish
-cd ~/Desktop/1800i-reloaded/libpie1800u
+python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --negative --deconvolve --out scan_everyday
+```
+
+#### 3. RAW 16-Bit Linear Master for External Grading (Negative Lab Pro / Darktable)
+```fish
+python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-balance --linear16 --out scan_raw_master
+```
+
+### Command-Line Arguments Reference
+
+| Flag | Default | Description |
+| :--- | :--- | :--- |
+| `--offset` | `1250` | Microsteps to advance carriage to film aperture (~17.6 mm). |
+| `--lines` | `950` | Total motor scanlines (950 steps covers a full 35mm frame). |
+| `--aspect` | `2` | Vertical aspect ratio scaling multiplier (2× gives true 1800 DPI square pixels). |
+| `--samples` | `1` | Multi-exposure temporal stacking ($N$ exposures averaged per line to cut noise by $\sqrt{N}$). |
+| `--analog-balance`| `False`| Asymmetric integration times (1.75× Blue boost) to balance dense orange negative mask. |
+| `--deconvolve` | `False`| Richardson-Lucy optical MTF deconvolution to restore rod lens sharpness. |
+| `--deconv-sigma` | `1.25` | Point Spread Function (PSF) blur radius for optical deconvolution. |
+| `--deconv-iters` | `8` | Iteration count for Richardson-Lucy deconvolution. |
+| `--linear16` | `True` | Exports uncompressed 16-bit linear RGB TIFF master (`<out>_linear16.tif`). |
+| `--negative` | `False`| Inverts RGB data for color negative film. |
+| `--gain` | `31` | Analog Front End (AFE) PGA gain (`0x1f`). |
+| `--out` | `scan_output`| Output filename prefix for `.png`, `.ppm`, `.tif`, and `_raw16.bin`. |
+
+---
+
+## 6. Building the Native C Driver & SANE Backend
+
+### Native C Driver Library
+```fish
+cd libpie1800u
 make
-./pie1800_cli 100 2000 c_scan_preview.ppm
+./pie1800_cli 950 1250 c_scan_output.ppm
 ```
 
-### C. Building the SANE Backend
+### SANE Backend Installation
 ```fish
-cd ~/Desktop/1800i-reloaded/sane-backend
+cd sane-backend
 make
 sudo make install
+scanimage -d pie1800u --format=png --output sane_scan.png
 ```
