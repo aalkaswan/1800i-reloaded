@@ -336,6 +336,16 @@ def main():
         print("Error: Pillow is required for image processing.", file=sys.stderr)
         sys.exit(1)
 
+    if not os.path.isfile(args.input):
+        print(f"\n[!] Error: Input image '{args.input}' does not exist.", file=sys.stderr)
+        # Search for available images
+        found = [f for f in sorted(os.listdir(".")) if f.endswith((".ppm", ".png", ".tif"))][:6]
+        if found:
+            print("[*] Available scans in current directory:", file=sys.stderr)
+            for f in found:
+                print(f"    • {f}", file=sys.stderr)
+        sys.exit(1)
+
     print(f"[*] Loading input image: {args.input}")
     im = Image.open(args.input)
     if im.mode != "RGB":

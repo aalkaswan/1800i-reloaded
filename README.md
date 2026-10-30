@@ -295,17 +295,20 @@ python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-b
 #### 7. Multi-Pass Sub-Pixel Super-Resolution (3600 DPI Equivalent)
 Acquires or combines multiple passes over the film aperture, registering microscopic sub-pixel shifts from carriage hysteresis to double vertical spatial resolution via Iterative Back-Projection (IBP) or Drizzle:
 ```fish
-# Multi-pass super-resolution from existing multi-pass scan files
-python3 scripts/pie1800_superres.py scan_pass1.ppm scan_pass2.ppm scan_pass3.ppm scan_pass4.ppm --method ibp --scale 2 --metrics --out scan_superres_3600dpi
+# 1. Super-resolve your existing master scan (uses sub-pixel jitter simulation)
+python3 scripts/pie1800_superres.py scan_fast_clean_scaled.ppm --simulate 4 --method ibp --scale 2 --metrics --out master_3600dpi
 
-# Drizzle variable-pixel reconstruction
-python3 scripts/pie1800_superres.py scan_pass1.ppm scan_pass2.ppm scan_pass3.ppm scan_pass4.ppm --method drizzle --pixfrac 0.7 --metrics --out scan_drizzle_3600dpi
+# 2. Or acquire 4 live physical passes directly from the scanner (automated carriage re-docking & hysteresis)
+python3 scripts/pie1800_superres.py --scan 4 --lines 950 --out scan_superres_3600dpi
 
-# Test and benchmark using sub-pixel jitter simulation on an existing scan
-python3 scripts/pie1800_superres.py scan_fast.ppm --simulate 4 --method ibp --metrics --out sim_3600dpi
+# 3. Super-resolve multiple existing passes captured from disk
+python3 scripts/pie1800_superres.py pass1.ppm pass2.ppm pass3.ppm pass4.ppm --method ibp --scale 2 --metrics --out scan_superres_3600dpi
 
-# Direct high-performance OpenMP C binary execution
-PIE_SCALE=2 PIE_ITERS=8 ./bin/pie1800_superres output_superres.ppm ibp scan_pass1.ppm scan_pass2.ppm scan_pass3.ppm scan_pass4.ppm
+# 4. Drizzle variable-pixel linear reconstruction
+python3 scripts/pie1800_superres.py scan_fast_clean_scaled.ppm --simulate 4 --method drizzle --pixfrac 0.7 --metrics --out scan_drizzle_3600dpi
+
+# 5. Direct high-performance OpenMP C binary execution
+PIE_SCALE=2 PIE_ITERS=8 ./bin/pie1800_superres output_superres.ppm ibp pass1.ppm pass2.ppm pass3.ppm pass4.ppm
 ```
 
 #### 8. Multi-Exposure Analog Bracketed HDR (Live Hardware)

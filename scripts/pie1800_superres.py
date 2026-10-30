@@ -229,12 +229,90 @@ def convert_raw16_to_ppm(bin_path, out_ppm, lines=950, negative=True, aspect=2):
             f.write(rgb_8bit)
 
 
+def acquire_hardware_passes(num_passes=4, lines=950, offset=1250, aspect=2, negative=True, output_dir="/tmp"):
+    """
+    Acquires N live physical scans from the PrimeFilm 1800u scanner via pie1800_scan.py.
+    Between passes, the carriage is retracted/re-homed. The mechanical gear train
+    and lead-screw backlash naturally introduces fractional sub-pixel spatial shifts
+    (dx, dy in [-0.5, +0.5] px), providing the physical optical phase diversity
+    required for computational super-resolution.
+    """
+    scan_script = os.path.join(REPO_ROOT, "scripts", "pie1800_scan.py")
+    if not os.path.isfile(scan_script):
+        raise RuntimeError(f"Scanner script not found: {scan_script}")
+
+    pass_paths = []
+    print("\n" + "=" * 70)
+    print(f"LIVE HARDWARE MULTI-PASS ACQUISITION ({num_passes} PASSES WITH MECHANICAL HYSTERESIS)")
+    print("=" * 70)
+
+    for i in range(num_passes):
+        out_base = os.path.join(output_dir, f"hw_pass_{i}")
+        print(f"\n[*] Acquiring Pass {i + 1}/{num_passes} (offset={offset}, lines={lines}, aspect={aspect})...")
+        cmd = [
+            sys.executable, scan_script,
+            "--mode", "pipelined",
+            "--offset", str(offset),
+            "--lines", str(lines),
+            "--aspect", str(aspect),
+            "--out", out_base,
+        ]
+        if negative:
+            cmd.append("--negative")
+
+        ret = subprocess.run(cmd)
+        if ret.returncode != 0:
+            raise RuntimeError(f"Scan pass {i + 1} failed with exit code {ret.returncode}")
+
+        # Locate output image
+        scaled_ppm = f"{out_base}_scaled.ppm"
+        raw_ppm = f"{out_base}.ppm"
+        png_path = f"{out_base}.png"
+
+        target_ppm = None
+        if os.path.isfile(scaled_ppm):
+            target_ppm = scaled_ppm
+        elif os.path.isfile(raw_ppm):
+            if aspect > 1 and HAS_PILLOW:
+                # Upsample aspect if not scaled yet
+                im = Image.open(raw_ppm)
+                target_h = im.size[1] * aspect
+                im_scaled = im.resize((im.size[0], target_h), Image.Resampling.LANCZOS)
+                im_scaled.save(scaled_ppm)
+                target_ppm = scaled_ppm
+            else:
+                target_ppm = raw_ppm
+        elif os.path.isfile(png_path) and HAS_PILLOW:
+            target_ppm = f"{out_base}.ppm"
+            im = Image.open(png_path).convert("RGB")
+            im.save(target_ppm)
+
+        if not target_ppm or not os.path.isfile(target_ppm):
+            raise RuntimeError(f"Could not locate output scan for pass {i + 1}")
+
+        pass_paths.append(target_ppm)
+        print(f"[+] Pass {i + 1} acquired successfully: {target_ppm}")
+        time.sleep(0.5)
+
+    return pass_paths
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="PrimeFilm 1800u / 1800i Super-Resolution Reconstruction Utility"
     )
     parser.add_argument("inputs", nargs="*",
                         help="Input PPM, PNG, TIFF, or _raw16.bin scan files (single-pass or multi-pass)")
+    parser.add_argument("--scan", type=int, default=0, metavar="N",
+                        help="Acquire N live hardware passes directly from the scanner with mechanical hysteresis")
+    parser.add_argument("--lines", type=int, default=950,
+                        help="Number of lines to scan per pass when using --scan (default: 950)")
+    parser.add_argument("--offset", type=int, default=1250,
+                        help="Carriage step offset to film aperture when using --scan (default: 1250)")
+    parser.add_argument("--aspect", type=int, default=2,
+                        help="Aspect ratio scaling multiplier (default: 2)")
+    parser.add_argument("--negative", action="store_true", default=True,
+                        help="Invert colors for negative film when using --scan (default: True)")
     parser.add_argument("--method", choices=["ibp", "drizzle"], default="ibp",
                         help="Super-resolution method: 'ibp' (Iterative Back-Projection + TV, default) or 'drizzle'")
     parser.add_argument("--scale", type=int, choices=[2, 3], default=2,
@@ -261,22 +339,95 @@ def main():
 
     input_files = list(args.inputs)
 
-    # If no inputs provided, search for existing master scans
-    if not input_files:
+    # Mode 1: Live Hardware Acquisition
+    if args.scan > 0:
+        input_files = acquire_hardware_passes(
+            num_passes=args.scan,
+            lines=args.lines,
+            offset=args.offset,
+            aspect=args.aspect,
+            negative=args.negative
+        )
+
+    # Mode 2: Existing files validation
+    elif input_files:
+        missing = [f for f in input_files if not os.path.isfile(f)]
+        if missing:
+            print(f"\n[!] Error: The following input scan file(s) do not exist:")
+            for m in missing:
+                print(f"    - '{m}'")
+            if any("scan_pass" in m for m in missing):
+                print("\n[!] Notice: 'scan_pass1.ppm' ... 'scan_pass4.ppm' are example placeholder filenames.")
+                print("    To run super-resolution, specify existing scans on disk, or run with '--simulate 4', or use '--scan 4'.")
+
+            # Discover existing scans on disk
+            found_scans = []
+            search_dirs = [os.getcwd(), REPO_ROOT]
+            seen = set()
+            for d in search_dirs:
+                if os.path.isdir(d):
+                    for f in sorted(os.listdir(d)):
+                        if f.endswith((".ppm", ".png", ".tif", ".tiff", ".bin")) and not f.startswith("superres") and not f.startswith("master_3600dpi"):
+                            fp = os.path.join(d, f)
+                            rel = os.path.relpath(fp, os.getcwd())
+                            if rel not in seen:
+                                seen.add(rel)
+                                found_scans.append(rel)
+            if found_scans:
+                print("\n[*] Found available scans in current directory:")
+                for s in found_scans[:8]:
+                    print(f"    • {s}")
+                sample = found_scans[0]
+                print(f"\n[*] Recommended command to super-resolve an existing scan:")
+                print(f"    python3 scripts/pie1800_superres.py {sample} --simulate 4 --method ibp --scale 2 --metrics --out master_3600dpi")
+                print(f"\n[*] Or scan live multi-pass directly from hardware:")
+                print(f"    python3 scripts/pie1800_superres.py --scan 4 --lines 950 --out master_3600dpi")
+            sys.exit(1)
+
+    # Mode 3: No inputs specified - auto-discover best master scan
+    else:
         candidates = [
-            os.path.join(REPO_ROOT, "photo_950lines_lanczos.ppm"),
-            os.path.join(REPO_ROOT, "scan_fast_scaled.ppm"),
-            os.path.join(REPO_ROOT, "scan_fast.ppm"),
+            "scan_fast_clean_scaled.ppm",
+            "scan_ultimate_master_scaled.ppm",
+            "scan_fast_clean_deconv_clean.ppm",
+            "scan_fast_clean.ppm",
+            "scan_fast_scaled.ppm",
+            "photo_950lines_lanczos.ppm",
+            "my_film_photo.ppm",
+            "scan_fast.ppm",
+            "interactive_scan.ppm",
         ]
+        auto_picked = None
         for c in candidates:
-            if os.path.isfile(c):
-                input_files = [c]
-                print(f"[*] No input files specified. Auto-selected: {c}")
+            for base in [os.getcwd(), REPO_ROOT]:
+                fp = os.path.join(base, c)
+                if os.path.isfile(fp):
+                    auto_picked = fp
+                    break
+            if auto_picked:
                 break
 
-    if not input_files:
-        parser.print_help()
-        sys.exit(1)
+        if auto_picked:
+            rel = os.path.relpath(auto_picked, os.getcwd())
+            print(f"[*] No input files specified. Auto-selected existing master scan:")
+            print(f"    '{rel}'")
+            input_files = [auto_picked]
+            if args.simulate <= 1:
+                args.simulate = 4
+                print(f"[*] Multi-frame super-resolution requires multiple observations.")
+                print(f"    Automatically simulating 4 sub-pixel jittered passes (--simulate 4).")
+        else:
+            parser.print_help()
+            print("\n[!] No input scan files found. Please provide an input scan, use --scan N, or acquire a scan first.")
+            sys.exit(1)
+
+    # Auto-simulate if only 1 input file provided
+    if len(input_files) == 1 and args.simulate <= 1:
+        print(f"[*] Single scan provided ('{input_files[0]}').")
+        print(f"[*] Multi-frame super-resolution requires sub-pixel shifted observations.")
+        print(f"    Automatically simulating 4 jittered passes (--simulate 4).")
+        print(f"    (Use multiple input files or '--scan 4' for live hardware super-resolution)")
+        args.simulate = 4
 
     # Handle RAW binary stream conversion
     processed_ppm_inputs = []
