@@ -411,6 +411,7 @@ Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of **16,200 by
 │   ├── comparison_live_fix.png          # Mechanical hysteresis registration comparison
 │   ├── comparison_bracketed_hdr.png     # Multi-exposure bracketed analog HDR comparison
 │   └── sample_scan_full.png             # Full 2,700 x 1,900 px 1800 DPI master scan
+├── docs/advanced_research_and_roadmap.md # Deep hardware archeology, scratch removal & roadmap
 ├── libpie1800u/                   # Standalone native C driver library
 │   ├── pie1800u.h                 # C API header
 │   ├── pie1800u.c                 # Low-level libusb-1.0 hardware implementation
@@ -422,6 +423,7 @@ Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of **16,200 by
 │   ├── pie1800u.conf              # SANE daemon device configuration
 │   └── Makefile                   # Builds and installs libsane-pie1800u.so.1
 ├── scripts/
+│   ├── primefilm_studio_app.py    # Desktop GUI application prototype (PySide6 / Qt)
 │   ├── pie1800_scan.py            # High-resolution scanner CLI (pipelined DMA, HDR, deconv, chroma)
 │   ├── pie1800_hdr.py             # Multi-exposure analog bracketed HDR engine
 │   ├── pie1800_superres.py        # Sub-pixel super-resolution pipeline (IBP-TV, Drizzle)
@@ -449,7 +451,32 @@ Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of **16,200 by
 
 ---
 
-## 7. License & Acknowledgements
+## 7. Advanced Research & Future Roadmap
+
+For in-depth reverse-engineering documentation, algorithmic formulations, and future platform architectures, see **[docs/advanced_research_and_roadmap.md](docs/advanced_research_and_roadmap.md)**:
+
+1. **Hardware Archeology & Hidden Features**:
+   - Complete ASIC register map (`0x80`–`0xff`) mapped from `PF1800U.dll`.
+   - Discovery of the undocumented native **450 DPI hardware decimation mode** (`0x9b = 0x60`, period `0x111111`) for ~4-second full frame previews.
+   - Physical confirmation of strictly 3-channel CCFL RGB optics (no IR LED or 4th channel) and absence of on-chip shading RAM.
+2. **Stepper Microstepping & Sub-Pixel Resolution**:
+   - Proof that GL640 / PIE ASIC motor logic is purely digital full/half-step with no programmable DAC motor current control.
+   - Formulation of mechanical lead-screw backlash hysteresis exploitation ($\Delta y \in [0.15, 0.45]\text{ px}$) and variance-weighted drizzling for true 3600 DPI optical recovery.
+3. **Software-Only Dust & Scratch Removal (Non-IR ICE Alternative)**:
+   - 4-stage defect detection combining Multi-Scale DMP (top-hat/black-hat), Directional Multiscale Hessian Sheetness (Frangi), Transport-Axis Gabor filtering, and CIE-LAB chromatic gating.
+   - Two-Scale Guided Base-Detail Inpainting with local parametric Poisson-Gaussian grain resynthesis, eliminating defects while keeping 100% of authentic silver halide film grain intact (works on traditional B&W silver film where hardware ICE fails).
+4. **Desktop Studio UI Application**:
+   - Cross-platform **PySide6** architecture with zero-copy `QImage` memory wrapping, real-time 11.7 lines/s line streaming, interactive 8-handle crop rectangles with rule-of-thirds, and 60 FPS 1D LUT negative grading.
+   - Isolated background engine daemon with POSIX Shared Memory IPC to guarantee fail-closed hardware motor safety.
+   - Ready-to-run prototype implementation in [`scripts/primefilm_studio_app.py`](scripts/primefilm_studio_app.py).
+5. **Modern 64-Bit Windows 10/11 Architecture**:
+   - Migration from legacy 32-bit `$CHICAGO$` STI drivers to Microsoft's in-box signed `WinUSB.sys` via Zadig or `pie1800u_winusb.inf`.
+   - Cross-compilation of `libpie1800u` with MinGW-w64 into native 64-bit `pie1800u.dll`.
+   - 64-bit TWAIN 2.0 Data Source (`pie1800u.ds`) and WIA 2.0 minidriver integration allowing direct scanning from 64-bit Adobe Photoshop CC and VueScan x64.
+
+---
+
+## 8. License & Acknowledgements
 
 - **License**: Released under the [MIT License](LICENSE).
 - **Acknowledgements**:
