@@ -339,11 +339,10 @@ def main():
 
     # Set integration times (per-channel)
     if args.analog_balance:
-        # Boost Blue integration time to balance the dense orange negative mask
-        # Orange mask has OD ~0.7 in Blue vs ~0.15 in Red, so Blue requires ~1.75x longer exposure
-        exp_r = int(args.exposure * 0.9)
+        # Blue integration boost to balance dense orange negative mask
+        exp_r = int(args.exposure * 1.0)
         exp_g = int(args.exposure * 1.0)
-        exp_b = int(args.exposure * 1.75)
+        exp_b = int(args.exposure * 1.25)
         print(f"[*] Analog Exposure Balancing Active: Red={exp_r}, Green={exp_g}, Blue={exp_b}")
     else:
         exp_r = exp_g = exp_b = args.exposure
