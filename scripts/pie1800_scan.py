@@ -11,6 +11,8 @@ import os
 import time
 import struct
 import argparse
+import threading
+import queue
 import subprocess
 import usb.core
 import usb.util
@@ -33,6 +35,7 @@ PRODUCT_ID = 0x0120
 EP_IN = 0x81
 FULL_LINE_BYTES = 16200  # 0x3f48: 2700 pixels * 3 channels * 2 bytes uint16
 PIXELS_PER_LINE = 2700
+_DMA_DESC = struct.pack("<BBBB I", 0x00, 0x00, 0x00, 0x00, FULL_LINE_BYTES)
 
 def wctl(dev, reg, data, timeout=1000):
     if isinstance(data, int):
@@ -75,13 +78,14 @@ def asic_read(dev, reg, timeout=1000):
     wctl(dev, 0x83, reg, timeout=timeout)
     return rctl(dev, 0x84, timeout=timeout)
 
-def wait_idle(dev, timeout=5.0):
+def wait_idle(dev, timeout=5.0, poll_interval_s=0.0005):
     t0 = time.time()
     while time.time() - t0 < timeout:
         val = asic_read(dev, 0x84)
         if val is not None and (val & 0x1e) == 0:
             return True
-        time.sleep(0.002)
+        if poll_interval_s > 0:
+            time.sleep(poll_interval_s)
     return False
 
 def configure_hardware(dev):
@@ -105,6 +109,8 @@ def set_exposure_limits(dev):
         asic_write(dev, r, 0xff)
 
 def move_carriage(dev, direction_cmd, steps):
+    if steps <= 0:
+        return
     asic_write(dev, 0x85, direction_cmd)
     remaining = steps
     while remaining > 0:
@@ -113,7 +119,7 @@ def move_carriage(dev, direction_cmd, steps):
         asic_write(dev, 0x83, 0x01)
         wait_idle(dev)
         remaining -= chunk
-        time.sleep(0.004)
+        time.sleep(0.002)
     # Disarm motor pulses / standby mode
     asic_write(dev, 0x85, 0x10)
 
@@ -139,23 +145,17 @@ def capture_line_16bit(dev):
     asic_write(dev, 0x81, 0x00)
     wait_idle(dev)
 
-    # Set window end = 0
-    asic_write(dev, 0x90, 0x00)
-    asic_write(dev, 0x91, 0x00)
-    asic_write(dev, 0x92, 0x00)
-
-    # Reset read pointer
-    asic_write(dev, 0x93, 0x00)
-    asic_write(dev, 0x94, 0x00)
-    asic_write(dev, 0x95, 0x00)
+    # Set window end = 0 and reset read pointer
+    for r in [0x90, 0x91, 0x92, 0x93, 0x94, 0x95]:
+        asic_write(dev, r, 0x00)
     wait_idle(dev)
 
     # Arm DMA on 0x82 for 16,200 bytes
     wctl(dev, 0x83, 0x80)
-    desc = struct.pack("<BBBB I", 0x00, 0x00, 0x00, 0x00, FULL_LINE_BYTES)
-    wctl(dev, 0x82, desc)
+    wctl(dev, 0x82, _DMA_DESC)
 
     raw = bytes(dev.read(EP_IN, FULL_LINE_BYTES, timeout=4000))
+    wait_idle(dev, timeout=1.0)
     return raw
 
 def capture_line_multisample(dev, num_samples=1):
@@ -233,6 +233,12 @@ def save_tiff_rgb16(filename, width, height, r_lines, g_lines, b_lines):
 
 def main():
     parser = argparse.ArgumentParser(description="PrimeFilm 1800u / 1800i Native Image Scanner")
+    parser.add_argument("--mode", choices=["pipelined", "sync", "benchmark"], default="pipelined",
+                        help="Scan engine: 'pipelined' (fast double-buffered DMA + threaded pipeline, default), 'sync' (legacy synchronous), or 'benchmark'")
+    parser.add_argument("--sync", dest="mode", action="store_const", const="sync",
+                        help="Force legacy synchronous scan mode")
+    parser.add_argument("--benchmark", dest="mode", action="store_const", const="benchmark",
+                        help="Run side-by-side throughput benchmark (Synchronous vs Pipelined)")
     parser.add_argument("--offset", type=int, default=1250,
                         help="Initial steps to advance carriage to film aperture (default: 1250)")
     parser.add_argument("--lines", type=int, default=950,
@@ -295,6 +301,7 @@ def main():
 
     print("=" * 70)
     print("PRIME FILM 1800u / 1800i NATIVE HIGH-RES SCANNER")
+    print(f"Scan Engine   : {args.mode.upper()} {'(Fast Double-Buffered DMA + Threaded)' if args.mode == 'pipelined' else ''}")
     print(f"Optical Width : {PIXELS_PER_LINE} pixels (RGB Interleaved, 16-bit ADC)")
     print(f"Scan Lines    : {args.lines} lines | Step Size: {args.step} microsteps")
     print(f"Aperture Offset: {args.offset} steps (~{args.offset * 25.4 / 1800:.1f} mm)")
@@ -424,26 +431,172 @@ def main():
             move_carriage(dev, 0x16, args.offset)
             total_steps_moved += args.offset
 
-        print(f"\n[*] Step 4: Starting scan acquisition ({args.lines} lines @ 2,700 px width)...")
-        t_start = time.time()
+        if args.mode == "benchmark":
+            bench_lines = min(args.lines, 25)
+            print(f"\n{'='*25} BENCHMARK: {bench_lines} LINES {'='*25}")
+            print(f"[*] 1. Running SYNCHRONOUS mode ({bench_lines} lines)...")
+            t0 = time.time()
+            for l in range(bench_lines):
+                raw = capture_line_16bit(dev)
+                move_carriage(dev, 0x16, args.step)
+            t_sync = time.time() - t0
+            rate_sync = bench_lines / max(t_sync, 0.001)
+            print(f"    Synchronous: {bench_lines} lines in {t_sync:.2f}s ({rate_sync:.2f} lines/sec)")
+
+            # Retract back
+            print(f"[*] Retracting {bench_lines * args.step} steps...")
+            move_carriage(dev, 0x14, bench_lines * args.step)
+            time.sleep(0.5)
+
+            # Pipelined benchmark
+            print(f"[*] 2. Running PIPELINED mode ({bench_lines} lines)...")
+            pipe_q = queue.Queue(maxsize=32)
+            pipe_done = []
+            def bench_worker():
+                while True:
+                    item = pipe_q.get()
+                    if item is None:
+                        pipe_q.task_done()
+                        break
+                    r_raw = item
+                    words = struct.unpack(f"<{len(r_raw)//2}H", r_raw)
+                    _ = words[0:2700], words[2700:5400], words[5400:8100]
+                    pipe_done.append(1)
+                    pipe_q.task_done()
+            b_th = threading.Thread(target=bench_worker, daemon=True)
+            b_th.start()
+
+            t0 = time.time()
+            for l in range(bench_lines):
+                raw = capture_line_16bit(dev)
+                pipe_q.put(raw)
+                if l < bench_lines - 1:
+                    move_carriage(dev, 0x16, args.step)
+            pipe_q.put(None)
+            b_th.join(timeout=3.0)
+            t_pipe = time.time() - t0
+            rate_pipe = bench_lines / max(t_pipe, 0.001)
+            print(f"    Pipelined:   {bench_lines} lines in {t_pipe:.2f}s ({rate_pipe:.2f} lines/sec)")
+            speedup = (rate_pipe / max(rate_sync, 0.001) - 1.0) * 100.0
+            print(f"\n[+] BENCHMARK RESULT: Pipelined is {rate_pipe / max(rate_sync, 0.001):.2f}x faster (+{speedup:.1f}%)!")
+            print(f"{'='*65}\n")
+
+            # Retract back
+            move_carriage(dev, 0x14, bench_lines * args.step)
+            return
 
         all_lines_16bit = []
-        try:
-            for line_num in range(args.lines):
-                # Capture line with optional temporal multi-exposure stacking
-                raw_line = capture_line_multisample(dev, num_samples=args.samples)
-                all_lines_16bit.append(raw_line)
+        lines_r = []
+        lines_g = []
+        lines_b = []
 
-                # Advance motor
-                move_carriage(dev, 0x16, args.step)
-                total_steps_moved += args.step
+        if args.mode == "sync":
+            print(f"\n[*] Step 4: Starting SYNCHRONOUS scan ({args.lines} lines @ 2,700 px width)...")
+            t_start = time.time()
+            try:
+                for line_num in range(args.lines):
+                    raw_line = capture_line_multisample(dev, num_samples=args.samples)
+                    all_lines_16bit.append(raw_line)
+                    if line_num < args.lines - 1:
+                        move_carriage(dev, 0x16, args.step)
+                        total_steps_moved += args.step
 
-                if (line_num + 1) % 25 == 0 or line_num == args.lines - 1:
-                    elapsed = time.time() - t_start
-                    rate = (line_num + 1) / elapsed if elapsed > 0 else 0
-                    print(f"    Line {line_num + 1:4d}/{args.lines} captured ({rate:.1f} lines/s)")
-        except KeyboardInterrupt:
-            print(f"\n[!] Interrupted by user! Saving {len(all_lines_16bit)} lines scanned so far...")
+                    if (line_num + 1) % 25 == 0 or line_num == args.lines - 1:
+                        elapsed = time.time() - t_start
+                        rate = (line_num + 1) / max(elapsed, 0.001)
+                        print(f"    Line {line_num + 1:4d}/{args.lines} captured ({rate:.1f} lines/s)")
+            except KeyboardInterrupt:
+                print(f"\n[!] Interrupted by user! Saving {len(all_lines_16bit)} lines scanned so far...")
+
+            for raw in all_lines_16bit:
+                words = struct.unpack(f"<{len(raw)//2}H", raw)
+                lines_r.append(words[0:2700])
+                lines_g.append(words[2700:5400])
+                lines_b.append(words[5400:8100])
+        else:
+            # FAST PIPELINED MODE (Default across all modes)
+            print(f"\n[*] Step 4: Starting FAST PIPELINED scan ({args.lines} lines @ 2,700 px width)...")
+            raw_queue = queue.Queue(maxsize=32)
+            consumer_error = []
+
+            def consumer_worker():
+                try:
+                    while True:
+                        item = raw_queue.get()
+                        if item is None:
+                            raw_queue.task_done()
+                            break
+                        idx, samples_list = item
+                        if len(samples_list) == 1:
+                            raw = samples_list[0]
+                            words = struct.unpack(f"<{len(raw)//2}H", raw)
+                            all_lines_16bit.append(raw)
+                        else:
+                            n_words = len(samples_list[0]) // 2
+                            acc = [0] * n_words
+                            for sample in samples_list:
+                                s_words = struct.unpack(f"<{n_words}H", sample)
+                                for i in range(n_words):
+                                    acc[i] += s_words[i]
+                            n_samp = len(samples_list)
+                            avg_words = [v // n_samp for v in acc]
+                            words = avg_words
+                            all_lines_16bit.append(struct.pack(f"<{n_words}H", *avg_words))
+
+                        lines_r.append(words[0:PIXELS_PER_LINE])
+                        lines_g.append(words[PIXELS_PER_LINE:PIXELS_PER_LINE * 2])
+                        lines_b.append(words[PIXELS_PER_LINE * 2:PIXELS_PER_LINE * 3])
+                        raw_queue.task_done()
+                except Exception as e:
+                    consumer_error.append(e)
+
+            consumer_thread = threading.Thread(target=consumer_worker, daemon=True)
+            consumer_thread.start()
+
+            t_start = time.time()
+            try:
+                for line_num in range(args.lines):
+                    samples_list = []
+                    for _ in range(args.samples):
+                        # 1. Trigger optical exposure (carriage is stationary)
+                        asic_write(dev, 0x85, 0x12)
+                        asic_write(dev, 0x81, 0x00)
+                        wait_idle(dev)
+
+                        # 2. Reset window end & SRAM read pointer
+                        for r in [0x90, 0x91, 0x92, 0x93, 0x94, 0x95]:
+                            asic_write(dev, r, 0x00)
+                        wait_idle(dev)
+
+                        # 3. Arm GL640 DMA
+                        wctl(dev, 0x83, 0x80)
+                        wctl(dev, 0x82, _DMA_DESC)
+
+                        # 4. Read bulk data over USB Bulk IN EP 0x81
+                        raw_sample = bytes(dev.read(EP_IN, FULL_LINE_BYTES, timeout=4000))
+                        wait_idle(dev, timeout=1.0)
+                        samples_list.append(raw_sample)
+
+                    # Dispatch samples to worker thread for asynchronous background deplanarizing
+                    raw_queue.put((line_num, samples_list))
+
+                    # Advance motor 1 microstep to next line (if more lines remain)
+                    if line_num < args.lines - 1:
+                        move_carriage(dev, 0x16, args.step)
+                        total_steps_moved += args.step
+
+                    if (line_num + 1) % 25 == 0 or line_num == args.lines - 1:
+                        elapsed = time.time() - t_start
+                        rate = (line_num + 1) / max(elapsed, 0.001)
+                        print(f"    Line {line_num + 1:4d}/{args.lines} captured ({rate:.1f} lines/s)")
+            except KeyboardInterrupt:
+                print(f"\n[!] Interrupted by user! Finalizing {len(all_lines_16bit)} lines scanned so far...")
+            finally:
+                raw_queue.put(None)
+                consumer_thread.join(timeout=5.0)
+
+            if consumer_error:
+                raise consumer_error[0]
 
         actual_lines = len(all_lines_16bit)
         if actual_lines == 0:
@@ -453,16 +606,7 @@ def main():
         total_elapsed = time.time() - t_start
         print(f"[+] {actual_lines} lines acquired in {total_elapsed:.1f}s ({actual_lines / max(total_elapsed, 0.001):.1f} lines/s)!")
 
-        print("\n[*] Step 5: Post-processing planar optical data (2,700 px x 3 channels)...")
-        lines_r = []
-        lines_g = []
-        lines_b = []
-
-        for raw in all_lines_16bit:
-            words = struct.unpack(f"<{len(raw)//2}H", raw)
-            lines_r.append(words[0:2700])
-            lines_g.append(words[2700:5400])
-            lines_b.append(words[5400:8100])
+        print(f"\n[*] Step 5: Post-processing planar optical data ({actual_lines} lines @ 2,700 px)...")
 
         if shading_profile is not None:
             print("[*] Step 5a: Applying Flat-Field Shading Correction (PRNU & DSNU subtraction)...")

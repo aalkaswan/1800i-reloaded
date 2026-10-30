@@ -4,8 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #define BACKEND_NAME "pie1800u"
+#define SANE_RING_BUFFER_SIZE 16
 
 enum {
     OPT_NUM_OPTS = 0,
@@ -34,6 +36,10 @@ static const SANE_Device *s_device_list[2] = {
 };
 
 typedef struct {
+    uint8_t data[PIE1800_LINE_PIXELS * 3];
+} sane_rgb_line_t;
+
+typedef struct {
     pie1800_device_t *hw;
     SANE_Parameters params;
     SANE_Option_Descriptor opt[NUM_OPTIONS];
@@ -44,11 +50,23 @@ typedef struct {
     int total_lines;
     int offset_steps;
 
-    uint16_t *line_buf;
     uint8_t *converted_line;
     int line_bytes_remaining;
     int line_offset;
-    int line_repeat;
+
+    // Pipelined background acquisition
+    pthread_t worker_thread;
+    pthread_mutex_t ring_mutex;
+    pthread_cond_t cond_readable;
+    pthread_cond_t cond_writable;
+    bool worker_running;
+    bool worker_stop;
+    int worker_status;
+
+    sane_rgb_line_t ring[SANE_RING_BUFFER_SIZE];
+    int ring_head;
+    int ring_tail;
+    int ring_count;
 } pie1800_session_t;
 
 static const SANE_String_Const s_scan_modes[] = {
@@ -150,7 +168,10 @@ SANE_Status sane_pie1800u_open(SANE_String_Const devicename, SANE_Handle *handle
 
     init_options(s);
 
-    s->line_buf = (uint16_t *)malloc(PIE1800_LINE_BYTES);
+    pthread_mutex_init(&s->ring_mutex, NULL);
+    pthread_cond_init(&s->cond_readable, NULL);
+    pthread_cond_init(&s->cond_writable, NULL);
+
     s->converted_line = (uint8_t *)malloc(PIE1800_LINE_PIXELS * 3);
     s->offset_steps = 1250; // Calibrated film aperture offset (~17.6 mm)
 
@@ -162,15 +183,18 @@ void sane_pie1800u_close(SANE_Handle handle) {
     pie1800_session_t *s = (pie1800_session_t *)handle;
     if (!s) return;
 
-    if (s->scanning) {
+    if (s->scanning || s->worker_running) {
         sane_pie1800u_cancel(handle);
     }
+
+    pthread_mutex_destroy(&s->ring_mutex);
+    pthread_cond_destroy(&s->cond_readable);
+    pthread_cond_destroy(&s->cond_writable);
 
     if (s->hw) {
         pie1800_close(s->hw);
         s->hw = NULL;
     }
-    free(s->line_buf);
     free(s->converted_line);
     free(s);
 }
@@ -230,9 +254,86 @@ SANE_Status sane_pie1800u_get_parameters(SANE_Handle handle, SANE_Parameters *pa
     return SANE_STATUS_GOOD;
 }
 
+static int sane_pipelined_line_cb(void *user_data, int line_idx, const uint16_t *line_buf) {
+    (void)line_idx;
+    pie1800_session_t *s = (pie1800_session_t *)user_data;
+    if (s->worker_stop) return -1; // Abort scan immediately
+
+    // Deplanarize 14-bit ADC samples to 8-bit Interleaved RGB
+    uint8_t temp_rgb[PIE1800_LINE_PIXELS * 3];
+    bool is_negative = (s->val[OPT_MODE] == 1);
+
+    for (int x = 0; x < PIE1800_LINE_PIXELS; x++) {
+        int r_s = line_buf[x] >> 2;
+        int g_s = line_buf[PIE1800_LINE_PIXELS + x] >> 2;
+        int b_s = line_buf[PIE1800_LINE_PIXELS * 2 + x] >> 2;
+
+        int vr = (r_s * 255) / 4095;
+        int vg = (g_s * 255) / 4095;
+        int vb = (b_s * 255) / 4095;
+
+        vr = (vr > 255) ? 255 : (vr < 0 ? 0 : vr);
+        vg = (vg > 255) ? 255 : (vg < 0 ? 0 : vg);
+        vb = (vb > 255) ? 255 : (vb < 0 ? 0 : vb);
+
+        if (is_negative) {
+            vr = 255 - vr;
+            vg = 255 - vg;
+            vb = 255 - vb;
+        }
+
+        temp_rgb[x * 3 + 0] = (uint8_t)vr;
+        temp_rgb[x * 3 + 1] = (uint8_t)vg;
+        temp_rgb[x * 3 + 2] = (uint8_t)vb;
+    }
+
+    // Deliver 2 lines for 1800 DPI square aspect ratio
+    for (int rep = 0; rep < 2; rep++) {
+        pthread_mutex_lock(&s->ring_mutex);
+        while (s->ring_count >= SANE_RING_BUFFER_SIZE && !s->worker_stop) {
+            pthread_cond_wait(&s->cond_writable, &s->ring_mutex);
+        }
+        if (s->worker_stop) {
+            pthread_mutex_unlock(&s->ring_mutex);
+            return -1;
+        }
+
+        memcpy(s->ring[s->ring_head].data, temp_rgb, sizeof(temp_rgb));
+        s->ring_head = (s->ring_head + 1) % SANE_RING_BUFFER_SIZE;
+        s->ring_count++;
+        pthread_cond_signal(&s->cond_readable);
+        pthread_mutex_unlock(&s->ring_mutex);
+    }
+
+    return 0;
+}
+
+static void *sane_worker_thread_func(void *arg) {
+    pie1800_session_t *s = (pie1800_session_t *)arg;
+    int motor_lines = s->total_lines / 2;
+    if (motor_lines <= 0) motor_lines = 1;
+
+    int ret = pie1800_scan_pipelined(s->hw, motor_lines, 1, sane_pipelined_line_cb, s);
+
+    pthread_mutex_lock(&s->ring_mutex);
+    s->worker_status = ret;
+    s->worker_running = false;
+    pthread_cond_broadcast(&s->cond_readable);
+    pthread_mutex_unlock(&s->ring_mutex);
+    return NULL;
+}
+
 SANE_Status sane_pie1800u_start(SANE_Handle handle) {
     pie1800_session_t *s = (pie1800_session_t *)handle;
     if (!s || !s->hw) return SANE_STATUS_INVAL;
+
+    if (s->worker_running) {
+        s->worker_stop = true;
+        pthread_cond_broadcast(&s->cond_writable);
+        pthread_cond_broadcast(&s->cond_readable);
+        pthread_join(s->worker_thread, NULL);
+        s->worker_running = false;
+    }
 
     pie1800_set_lamp(s->hw, true);
     usleep(1500000); // 1.5s warm-up
@@ -246,7 +347,19 @@ SANE_Status sane_pie1800u_start(SANE_Handle handle) {
     s->total_lines = s->params.lines > 0 ? s->params.lines : 1900;
     s->line_bytes_remaining = 0;
     s->line_offset = 0;
-    s->line_repeat = 0;
+
+    s->ring_head = 0;
+    s->ring_tail = 0;
+    s->ring_count = 0;
+    s->worker_stop = false;
+    s->worker_status = 0;
+    s->worker_running = true;
+
+    if (pthread_create(&s->worker_thread, NULL, sane_worker_thread_func, s) != 0) {
+        s->worker_running = false;
+        s->scanning = false;
+        return SANE_STATUS_NO_MEM;
+    }
 
     return SANE_STATUS_GOOD;
 }
@@ -269,46 +382,27 @@ SANE_Status sane_pie1800u_read(SANE_Handle handle, SANE_Byte *data, SANE_Int max
                 break;
             }
 
-            if (s->line_repeat == 0) {
-                int ret = pie1800_scan_line(s->hw, s->line_buf);
-                if (ret < 0) return SANE_STATUS_IO_ERROR;
-
-                // Deplanarize 14-bit ADC samples (Planar R, G, B) to 8-bit Interleaved RGB
-                bool is_negative = (s->val[OPT_MODE] == 1);
-                for (int x = 0; x < PIE1800_LINE_PIXELS; x++) {
-                    int r_s = s->line_buf[x] >> 2;
-                    int g_s = s->line_buf[PIE1800_LINE_PIXELS + x] >> 2;
-                    int b_s = s->line_buf[PIE1800_LINE_PIXELS * 2 + x] >> 2;
-
-                    int vr = (r_s * 255) / 4095;
-                    int vg = (g_s * 255) / 4095;
-                    int vb = (b_s * 255) / 4095;
-
-                    vr = (vr > 255) ? 255 : (vr < 0 ? 0 : vr);
-                    vg = (vg > 255) ? 255 : (vg < 0 ? 0 : vg);
-                    vb = (vb > 255) ? 255 : (vb < 0 ? 0 : vb);
-
-                    if (is_negative) {
-                        vr = 255 - vr;
-                        vg = 255 - vg;
-                        vb = 255 - vb;
-                    }
-
-                    s->converted_line[x * 3 + 0] = (uint8_t)vr;
-                    s->converted_line[x * 3 + 1] = (uint8_t)vg;
-                    s->converted_line[x * 3 + 2] = (uint8_t)vb;
-                }
-
-                // Advance stepper 1 microstep (~900 DPI pitch)
-                pie1800_move(s->hw, PIE1800_DIR_FORWARD, 1);
-                s->line_repeat = 1; // Deliver second line of pair for 1800 DPI square aspect
-            } else {
-                s->line_repeat = 0;
+            pthread_mutex_lock(&s->ring_mutex);
+            while (s->ring_count == 0 && s->worker_running && !s->worker_stop) {
+                pthread_cond_wait(&s->cond_readable, &s->ring_mutex);
             }
 
-            s->current_line++;
-            s->line_bytes_remaining = PIE1800_LINE_PIXELS * 3;
-            s->line_offset = 0;
+            if (s->ring_count > 0) {
+                memcpy(s->converted_line, s->ring[s->ring_tail].data, PIE1800_LINE_PIXELS * 3);
+                s->ring_tail = (s->ring_tail + 1) % SANE_RING_BUFFER_SIZE;
+                s->ring_count--;
+                pthread_cond_signal(&s->cond_writable);
+                pthread_mutex_unlock(&s->ring_mutex);
+
+                s->current_line++;
+                s->line_bytes_remaining = PIE1800_LINE_PIXELS * 3;
+                s->line_offset = 0;
+            } else {
+                bool has_err = (s->worker_status < 0);
+                pthread_mutex_unlock(&s->ring_mutex);
+                if (has_err) return SANE_STATUS_IO_ERROR;
+                break; // EOF reached
+            }
         }
 
         int chunk = max_length - bytes_copied;
@@ -331,6 +425,15 @@ void sane_pie1800u_cancel(SANE_Handle handle) {
     if (!s || !s->hw) return;
 
     s->scanning = false;
+
+    if (s->worker_running) {
+        s->worker_stop = true;
+        pthread_cond_broadcast(&s->cond_writable);
+        pthread_cond_broadcast(&s->cond_readable);
+        pthread_join(s->worker_thread, NULL);
+        s->worker_running = false;
+    }
+
     pie1800_home(s->hw);
     pie1800_set_lamp(s->hw, false);
 }

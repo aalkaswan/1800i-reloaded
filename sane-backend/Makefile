@@ -1,6 +1,6 @@
 CC ?= gcc
-CFLAGS ?= -O2 -Wall -Wextra -fPIC -I../libpie1800u $(shell pkg-config --cflags libusb-1.0)
-LDFLAGS ?= $(shell pkg-config --libs libusb-1.0)
+CFLAGS ?= -O2 -Wall -Wextra -pthread -fPIC -I../libpie1800u $(shell pkg-config --cflags libusb-1.0)
+LDFLAGS ?= -pthread $(shell pkg-config --libs libusb-1.0)
 
 all: libsane-pie1800u.so.1
 

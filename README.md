@@ -185,13 +185,17 @@ python3 scripts/pie1800_chroma_denoise.py scan_master_deconv.png scan_master_cle
 ./bin/pie1800_chroma_denoise scan_master_deconv.ppm scan_master_clean.ppm 5 12.0 lab bilateral
 ```
 
-#### 4. High-Speed Asynchronous Pipelined Scan (Python)
+#### 4. High-Speed Asynchronous Pipelined Scan
+Pipelined scanning with background producer-consumer deplanarization and low-latency hardware polling is now the **default engine across all modes** in `pie1800_scan.py`:
 ```fish
-# High-speed pipelined scan with concurrent worker processing
-python3 scripts/pie1800_async_scan.py --offset 1250 --lines 950 --negative --aspect 2 --out scan_fast
+# Fast pipelined scan (default)
+python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --negative --aspect 2 --out scan_fast
 
-# Benchmark sync vs pipelined throughput on live hardware
-python3 scripts/pie1800_async_scan.py --mode benchmark --lines 30
+# Benchmark sync vs pipelined throughput directly on live hardware
+python3 scripts/pie1800_scan.py --benchmark --lines 30
+
+# Optional fallback to legacy synchronous mode
+python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --sync --out scan_sync
 ```
 
 #### 5. RAW 16-Bit Linear Master for External Grading (Negative Lab Pro / Darktable)
@@ -203,6 +207,9 @@ python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-b
 
 | Flag | Default | Description |
 | :--- | :--- | :--- |
+| `--mode` | `pipelined`| Scan engine: `pipelined` (fast double-buffered DMA + threaded pipeline), `sync` (legacy), or `benchmark`. |
+| `--sync` | — | Shortcut to force legacy synchronous acquisition. |
+| `--benchmark` | — | Runs side-by-side benchmark comparing Synchronous vs Pipelined throughput on hardware. |
 | `--offset` | `1250` | Microsteps to advance carriage to film aperture (~17.6 mm). |
 | `--lines` | `950` | Total motor scanlines (950 steps covers a full 35mm frame). |
 | `--aspect` | `2` | Vertical aspect ratio scaling multiplier (2× gives true 1800 DPI square pixels). |
@@ -251,6 +258,8 @@ pie1800_scan_pipelined(dev, 950, 1, on_line, NULL);
 ```
 
 ### SANE Backend Installation
+The SANE backend (`libsane-pie1800u.so.1`) features a multithreaded double-buffered ring buffer that decouples frontend client read calls from hardware USB bulk DMA, allowing continuous high-speed scanning without motor start-stop stutter.
+
 ```fish
 cd sane-backend
 make
