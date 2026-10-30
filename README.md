@@ -90,7 +90,16 @@ Acquired natively on Linux using `pie1800_scan.py` with the high-speed pipelined
 
 ![PrimeFilm 1800u Full 1800 DPI Master Scan](docs/images/sample_scan_full.png)
 
-### B. High-Speed Pipelined Master Restoration Pipeline
+### B. Optimal Negative Scanning & Conversion Modes Showcase
+Side-by-side comparison of the four primary acquisition and negative conversion pipelines evaluated on an identical physical 35mm film target:
+1. **Raw Baseline Optical Scan**: Standard single-pass scan with uncorrected rod-lens MTF blur and sensor ADC noise.
+2. **Archival Master (Recommended Best Setting)**: $4\times$ temporal stacking, hardware analog blue exposure balancing, spatially-varying guided LCA deconvolution, CIE-LAB chroma grain-preserving denoising, and neutral orange mask cancellation.
+3. **Multi-Exposure Bracketed Analog HDR (Mertens Fusion)**: 3-bracket acquisition (`[2800, 3100, 3500]` clocks) with streak-free dynamic optical black grounding and multi-scale contrast blending for dense shadow penetration.
+4. **Filmic ACES Pro HDR**: Debevec/Poisson linear radiance recovery with filmic ACES S-curve compression and 16-bit uncompressed linear TIFF export.
+
+![Optimal Negative Scanning & Conversion Modes Comparison](docs/images/comparison_negative_settings.png)
+
+### C. High-Speed Pipelined Master Restoration Pipeline
 Crop comparison illustrating the 3-stage transformation from the raw pipelined USB DMA stream to the final clean photographic master:
 
 ![Fast Pipelined Restoration Pipeline](docs/images/comparison_fast_pipeline.png)
@@ -101,7 +110,7 @@ Crop comparison illustrating the 3-stage transformation from the raw pipelined U
 | **2. RL Deconvolution** | 3.2s full frame (C engine) | **+42.1% Laplacian acutance** | Rod-lens optical blur removed; silver halide grain structures snap into sharp focus. |
 | **3. Chroma Clean Master** | 0.65s full frame (7.9 MP/s) | **100% acutance preserved** | **77.2% shadow color noise eliminated**; luminance $L^*$ untouched ($\Delta L = 0.000$). |
 
-### C. Resolution Enhancement Comparison Matrix
+### D. Resolution Enhancement Comparison Matrix
 Crop comparison demonstrating the visual impact of each interpolation and deconvolution stage on film grain micro-contrast:
 
 ![Enhancement Comparison Matrix](docs/images/comparison_enhancement_matrix.png)
@@ -113,12 +122,12 @@ Crop comparison demonstrating the visual impact of each interpolation and deconv
 | **3. RL Deconvolution (Standard)** | Natural film grain | Cleaned high frequencies | $\sigma=1.25, 8\text{ iters}$. Restores lens MTF loss; film grain pops into focus. |
 | **4. RL Deconvolution (Strong)** | Maximum micro-contrast | Boosted edge acutance | $\sigma=1.60, 14\text{ iters}$. Ideal for ultra-fine grain film (Kodak Ektar / T-Max). |
 
-### D. Full Frame 100% Zoom MTF Comparison
+### E. Full Frame 100% Zoom MTF Comparison
 Direct 1:1 pixel comparison across the full 950-line film frame showing the dramatic acutance recovery across fine hair, textures, and film grain boundaries:
 
 ![100% Zoom Optical Deconvolution Comparison](docs/images/comparison_resolution_950.png)
 
-### E. Chroma-Only Grain-Preserving Denoising Showcase
+### F. Chroma-Only Grain-Preserving Denoising Showcase
 Comparison demonstrating the elimination of electronic sensor ADC color noise while keeping 100% of the natural silver halide film grain and optical edge acutance completely untouched:
 
 ![Chroma Denoise Comparison Matrix](docs/images/comparison_chroma_denoise.png)
@@ -129,7 +138,7 @@ Comparison demonstrating the elimination of electronic sensor ADC color noise wh
 | **Traditional RGB Denoise** | `52.39` (**-56.3% blurred**) | Smeared colors | **Plastic / waxy look**; destroys silver halide micro-detail. |
 | **Chroma-Only Decoupled (CIE-LAB)** | `129.28` (**100% sharp intact**) | **77.2% noise eliminated** | **Authentic film look**; razor-sharp grain with clean, velvety color. |
 
-### F. Physical Motor Pitch & Aspect Ratio Calibration
+### G. Physical Motor Pitch & Aspect Ratio Calibration
 Demonstration of physical carriage geometry: the scanner stepper motor advances at 900 DPI ($1/900\text{ inch}$ pitch) while the optical CCD captures 1800 DPI ($1/1800\text{ inch}$ pixels), requiring an exact $2\times$ anisotropic expansion to achieve square pixels:
 
 ![Motor Pitch and Aspect Ratio Comparison](docs/images/comparison_aspect_ratio.png)
@@ -139,7 +148,7 @@ Demonstration of physical carriage geometry: the scanner stepper motor advances 
 | **1× Raw Motor Pitch** | 1800 DPI | 900 DPI | 2:1 Anamorphic | Vertically squished; circles appear as flat ellipses. |
 | **2× Calibrated Lanczos** | 1800 DPI | 1800 DPI (effective) | **3:2 Square Pixels** | **True photographic geometry**; geometrically perfect circle reproduction. |
 
-### G. Spatially-Varying PSF Modeling & Radial Lateral Chromatic Aberration (LCA) Correction
+### H. Spatially-Varying PSF Modeling & Radial Lateral Chromatic Aberration (LCA) Correction
 The PrimeFilm 1800u/1800i utilizes a **Selfoc / Gradient-Index (GRIN) rod-lens array**. Because rod lenses suffer from off-axis radial field curvature and wavelength-dependent refraction $n(\lambda)$, optical acutance drops towards the periphery ($x < 300, x > 2400$) and color channels exhibit radial lateral chromatic displacement.
 
 `pie1800_lca_deconv` implements a state-of-the-art optical reconstruction engine combining:
@@ -160,7 +169,7 @@ Full photographic frame comparison demonstrating the simultaneous compensation o
 | **2. Uniform RL ($\sigma=1.25$)** | `93.92` (+28.9%) | `0.224 px` (fringed) | `95.36` (noisy) | Sharper, but amplifies chromatic fringing and shadow noise speckles. |
 | **3. Spatially-Varying Guided LCA** | `92.44` (**+26.9% sharp**) | **`0.071 px` (-73.1% fringe)** | `93.82` (**pristine**) | **Razor-sharp film grain**; zero color fringing; silky noise-free flat areas. |
 
-### H. Sub-Pixel Super-Resolution & Micro-Scanning (IBP & Drizzle)
+### I. Sub-Pixel Super-Resolution & Micro-Scanning (IBP & Drizzle)
 While the GL640 USB bridge ASIC and stepper motor logic operate with discrete integer step counts (where 1 half-step = ~14.11 $\mu$m = 1800 DPI physical limit without analog DAC current microstepping), multi-pass acquisition exploits natural **mechanical hysteresis and lead-screw backlash** ($\Delta y \in [0.1, 0.9]\text{ px}$) between successive passes to capture sub-pixel shifted optical phase information across the film frame.
 
 `pie1800_superres` implements a native, multi-threaded C super-resolution engine featuring:
@@ -197,7 +206,7 @@ Comparison showing the elimination of multi-pass registration blur caused by mec
 
 ![Live Hardware Sub-Pixel Alignment Comparison](docs/images/comparison_live_fix.png)
 
-### I. Multi-Exposure Analog Bracketed HDR & Film Dmax Extender (Dmax > 3.8)
+### J. Multi-Exposure Analog Bracketed HDR & Film Dmax Extender (Dmax > 3.8)
 By unlocking the 24-bit ASIC exposure limits (`0xa2..0xaa -> 0xff`), the integration counter is expanded to over 16 million clocks. Multi-exposure analog bracketing captures a wide dynamic range sequence at each carriage step, extracting deep shadow details through dense negative masks that are normally lost below the 14-bit ADC noise floor.
 
 Live dynamic optical black referencing (extracting $V_{\text{OB}} \approx 1854$ from physical aluminum-masked dummy sensels 10..40 on every line) and continuous integration timing (`[2800, 3100, 3500]` clocks) ensure pristine, artifact-free multi-exposure blending:
