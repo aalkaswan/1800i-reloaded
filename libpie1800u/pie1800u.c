@@ -65,15 +65,16 @@ int pie1800_reg_read(pie1800_device_t *dev, uint8_t reg, uint8_t *val_out) {
 }
 
 int pie1800_wait_idle(pie1800_device_t *dev, int timeout_ms) {
-    int waited = 0;
-    while (waited < timeout_ms) {
+    int waited_us = 0;
+    int timeout_us = timeout_ms * 1000;
+    while (waited_us < timeout_us) {
         uint8_t val = 0;
         int ret = pie1800_reg_read(dev, 0x84, &val);
         if (ret == 0 && (val & 0x1e) == 0) {
             return 0; // ASIC idle
         }
-        usleep(2000); // 2ms
-        waited += 2;
+        usleep(500); // 500us poll interval for low latency
+        waited_us += 500;
     }
     return -ETIMEDOUT;
 }
@@ -245,6 +246,165 @@ int pie1800_scan_line(pie1800_device_t *dev, uint16_t *buffer) {
     if (transferred != PIE1800_LINE_BYTES) return -EIO;
 
     return 0;
+}
+
+typedef struct {
+    int completed;
+    int status;
+    int actual_length;
+} pie1800_async_ctx_t;
+
+static void LIBUSB_CALL pie1800_bulk_in_cb(struct libusb_transfer *xfr) {
+    pie1800_async_ctx_t *ctx = (pie1800_async_ctx_t *)xfr->user_data;
+    if (ctx) {
+        ctx->completed = 1;
+        ctx->status = xfr->status;
+        ctx->actual_length = xfr->actual_length;
+    }
+}
+
+int pie1800_scan_pipelined(pie1800_device_t *dev,
+                           int lines,
+                           int step_size,
+                           pie1800_line_callback_t callback,
+                           void *user_data) {
+    if (!dev || lines <= 0 || step_size <= 0) return -EINVAL;
+
+    // Hard rail limit enforcement: 2260 microsteps max travel
+    if (dev->current_position + lines * step_size > PIE1800_MAX_TRAVEL_STEPS) {
+        int max_allowed = (PIE1800_MAX_TRAVEL_STEPS - dev->current_position) / step_size;
+        if (max_allowed <= 0) return -ERANGE;
+        lines = max_allowed;
+    }
+
+    // Allocate ping-pong buffers for double buffering
+    uint16_t *buffers[2];
+    buffers[0] = (uint16_t *)malloc(PIE1800_LINE_BYTES);
+    buffers[1] = (uint16_t *)malloc(PIE1800_LINE_BYTES);
+    if (!buffers[0] || !buffers[1]) {
+        free(buffers[0]);
+        free(buffers[1]);
+        return -ENOMEM;
+    }
+
+    struct libusb_transfer *xfr[2];
+    xfr[0] = libusb_alloc_transfer(0);
+    xfr[1] = libusb_alloc_transfer(0);
+    if (!xfr[0] || !xfr[1]) {
+        if (xfr[0]) libusb_free_transfer(xfr[0]);
+        if (xfr[1]) libusb_free_transfer(xfr[1]);
+        free(buffers[0]);
+        free(buffers[1]);
+        return -ENOMEM;
+    }
+
+    pie1800_async_ctx_t ctx[2] = {{0}, {0}};
+
+    // Initialize scan window end registers once
+    pie1800_reg_write(dev, 0x90, 0x00);
+    pie1800_reg_write(dev, 0x91, 0x00);
+    pie1800_reg_write(dev, 0x92, 0x00);
+
+    // Arm motor driver in forward direction
+    pie1800_reg_write(dev, 0x85, PIE1800_DIR_FORWARD);
+
+    int ret = 0;
+    uint8_t desc[8] = {0x00, 0x00, 0x00, 0x00,
+                       (uint8_t)(PIE1800_LINE_BYTES & 0xff),
+                       (uint8_t)((PIE1800_LINE_BYTES >> 8) & 0xff),
+                       (uint8_t)((PIE1800_LINE_BYTES >> 16) & 0xff),
+                       (uint8_t)((PIE1800_LINE_BYTES >> 24) & 0xff)};
+
+    for (int l = 0; l < lines; l++) {
+        int buf_idx = l % 2;
+
+        // 1. Trigger optical exposure (carriage is stationary)
+        pie1800_reg_write(dev, 0x85, 0x12);
+        pie1800_reg_write(dev, 0x81, 0x00);
+        ret = pie1800_wait_idle(dev, 5000);
+        if (ret < 0) break;
+
+        // 2. Reset read pointer
+        pie1800_reg_write(dev, 0x93, 0x00);
+        pie1800_reg_write(dev, 0x94, 0x00);
+        pie1800_reg_write(dev, 0x95, 0x00);
+
+        // 3. Arm GL640 DMA
+        wctl_byte(dev, 0x83, 0x80);
+        ret = wctl(dev, 0x82, desc, sizeof(desc));
+        if (ret < 0) break;
+
+        // 4. Submit asynchronous Bulk IN transfer
+        ctx[buf_idx].completed = 0;
+        ctx[buf_idx].status = 0;
+        ctx[buf_idx].actual_length = 0;
+
+        libusb_fill_bulk_transfer(xfr[buf_idx], dev->handle, PIE1800_EP_IN,
+                                  (unsigned char *)buffers[buf_idx], PIE1800_LINE_BYTES,
+                                  pie1800_bulk_in_cb, &ctx[buf_idx], 4000);
+        ret = libusb_submit_transfer(xfr[buf_idx]);
+        if (ret < 0) break;
+
+        // Wait for Bulk IN transfer to complete
+        while (!ctx[buf_idx].completed) {
+            struct timeval tv = {0, 1000};
+            libusb_handle_events_timeout_completed(dev->ctx, &tv, &ctx[buf_idx].completed);
+        }
+
+        if (ctx[buf_idx].status != LIBUSB_TRANSFER_COMPLETED ||
+            ctx[buf_idx].actual_length != PIE1800_LINE_BYTES) {
+            ret = -EIO;
+            break;
+        }
+
+        // Verify ASIC status is idle
+        ret = pie1800_wait_idle(dev, 2000);
+        if (ret < 0) break;
+
+        // Deliver line to callback
+        if (callback) {
+            ret = callback(user_data, l, buffers[buf_idx]);
+            if (ret != 0) break; // User abort
+        }
+
+        // Advance motor 1 microstep to next line (if more lines remain)
+        if (l < lines - 1) {
+            pie1800_reg_write(dev, 0x81, (uint8_t)step_size);
+            pie1800_reg_write(dev, 0x83, 0x01);
+            ret = pie1800_wait_idle(dev, 5000);
+            if (ret < 0) break;
+            dev->current_position += step_size;
+        }
+    }
+
+    // Always disarm motor driver at end of movement
+    pie1800_reg_write(dev, 0x85, 0x10);
+
+    libusb_free_transfer(xfr[0]);
+    libusb_free_transfer(xfr[1]);
+    free(buffers[0]);
+    free(buffers[1]);
+
+    return ret;
+}
+
+typedef struct {
+    uint16_t *dest;
+} buffer_fill_ctx_t;
+
+static int buffer_fill_cb(void *user_data, int line_idx, const uint16_t *line_buffer) {
+    buffer_fill_ctx_t *bctx = (buffer_fill_ctx_t *)user_data;
+    memcpy(bctx->dest + (size_t)line_idx * (PIE1800_LINE_BYTES / 2), line_buffer, PIE1800_LINE_BYTES);
+    return 0;
+}
+
+int pie1800_scan_pipelined_buffer(pie1800_device_t *dev,
+                                  int lines,
+                                  int step_size,
+                                  uint16_t *out_buffer) {
+    if (!out_buffer) return -EINVAL;
+    buffer_fill_ctx_t bctx = { .dest = out_buffer };
+    return pie1800_scan_pipelined(dev, lines, step_size, buffer_fill_cb, &bctx);
 }
 
 int pie1800_init(pie1800_device_t *dev) {

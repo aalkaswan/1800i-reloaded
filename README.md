@@ -100,6 +100,17 @@ Crop comparison demonstrating the visual impact of each processing stage on film
 | **3. RL Deconvolution (Standard)** | Natural film grain | Cleaned high frequencies | $\sigma=1.25, 8\text{ iters}$. Restores lens MTF loss; film grain pops into focus. |
 | **4. RL Deconvolution (Strong)** | Maximum micro-contrast | Boosted edge acutance | $\sigma=1.60, 14\text{ iters}$. Ideal for ultra-fine grain film (Kodak Ektar / T-Max). |
 
+### Chroma-Only Grain-Preserving Denoising Showcase
+Comparison demonstrating the elimination of electronic sensor ADC color noise while keeping 100% of the natural silver halide film grain and optical edge acutance completely untouched:
+
+![Chroma Denoise Comparison Matrix](docs/images/comparison_chroma_denoise.png)
+
+| Denoising Mode | Grain Acutance (Laplacian MTF) | Chrominance Noise Reduction | Optical Authenticity |
+| :--- | :--- | :--- | :--- |
+| **Raw Deconvolved Scan** | `119.92` (baseline) | High ADC speckles (0% reduced) | Natural grain visible but contaminated by sensor color confetti. |
+| **Traditional RGB Denoise** | `52.39` (**-56.3% blurred**) | Smeared colors | **Plastic / waxy look**; destroys silver halide micro-detail. |
+| **Chroma-Only Decoupled (CIE-LAB)** | `129.28` (**100% sharp intact**) | **77.2% noise eliminated** | **Authentic film look**; razor-sharp grain with clean, velvety color. |
+
 ---
 
 ## 4. Repository Layout
@@ -121,7 +132,11 @@ Crop comparison demonstrating the visual impact of each processing stage on film
 │   └── Makefile                   # Builds libsane-pie1800u.so.1
 ├── scripts/
 │   ├── pie1800_scan.py            # High-resolution image scanner with auto-positioning, multi-exposure & PNG/TIFF export
+│   ├── pie1800_async_scan.py      # High-speed asynchronous pipelined scanner & benchmark tool
 │   ├── pie1800_deconv.c           # High-performance C Richardson-Lucy optical MTF deconvolution engine
+│   ├── pie1800_chroma_denoise.c   # High-performance C CIE-LAB & YCbCr chroma-only grain-preserving denoiser
+│   ├── pie1800_chroma_denoise.py  # Python chroma denoiser CLI & ctypes accelerator bindings
+│   ├── generate_chroma_comparison.py # Side-by-side zoom comparison generator
 │   ├── test_full_line_16200.py    # 16,200-byte 16-bit uint16 optical line readout benchmark
 │   ├── test_sram_read.py          # CCD sampling gate & dark vs light modulation test
 │   ├── interactive_jog_and_scan.py# Interactive carriage jogger & optical test console
@@ -151,17 +166,35 @@ Crop comparison demonstrating the visual impact of each processing stage on film
 
 ### Scanning Profiles
 
-#### 1. Archival Master Scan (Multi-Exposure 4× + Analog Balance + Deconvolution + 16-Bit TIFF)
+#### 1. Archival Master Scan (Multi-Exposure 4× + Analog Balance + Deconvolution + Chroma Denoise + 16-Bit TIFF)
 ```fish
-python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-balance --negative --deconvolve --out scan_master
+python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-balance --negative --deconvolve --chroma-denoise --out scan_master
 ```
 
-#### 2. Everyday Fast Scan (Deconvolved)
+#### 2. Everyday Fast Scan (Deconvolved & Chroma Cleaned)
 ```fish
-python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --negative --deconvolve --out scan_everyday
+python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --negative --deconvolve --chroma-denoise --out scan_everyday
 ```
 
-#### 3. RAW 16-Bit Linear Master for External Grading (Negative Lab Pro / Darktable)
+#### 3. Standalone Chroma Denoising (Fast C Engine)
+```fish
+# Python CLI (PNG / PPM / TIF)
+python3 scripts/pie1800_chroma_denoise.py scan_master_deconv.png scan_master_clean.png --radius 5 --strength 12.0 --colorspace lab
+
+# Direct C Binary (PPM)
+./bin/pie1800_chroma_denoise scan_master_deconv.ppm scan_master_clean.ppm 5 12.0 lab bilateral
+```
+
+#### 4. High-Speed Asynchronous Pipelined Scan (Python)
+```fish
+# High-speed pipelined scan with concurrent worker processing
+python3 scripts/pie1800_async_scan.py --offset 1250 --lines 950 --negative --aspect 2 --out scan_fast
+
+# Benchmark sync vs pipelined throughput on live hardware
+python3 scripts/pie1800_async_scan.py --mode benchmark --lines 30
+```
+
+#### 5. RAW 16-Bit Linear Master for External Grading (Negative Lab Pro / Darktable)
 ```fish
 python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-balance --linear16 --out scan_raw_master
 ```
@@ -178,6 +211,11 @@ python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-b
 | `--deconvolve` | `False`| Richardson-Lucy optical MTF deconvolution to restore rod lens sharpness. |
 | `--deconv-sigma` | `1.25` | Point Spread Function (PSF) blur radius for optical deconvolution. |
 | `--deconv-iters` | `8` | Iteration count for Richardson-Lucy deconvolution. |
+| `--chroma-denoise` | `False`| Decoupled chroma-only grain-preserving denoiser (eliminates sensor color noise). |
+| `--chroma-radius` | `5` | Spatial filter radius in pixels for chrominance channels. |
+| `--chroma-strength`| `12.0` | Range filter strength for chrominance edge preservation. |
+| `--chroma-space` | `lab` | Decoupled color space: `lab` (CIE-LAB perceptual) or `ycbcr`. |
+| `--chroma-filter`| `bilateral`| Filter algorithm: `bilateral` (edge-preserving) or `guided` ($O(1)$ fast). |
 | `--linear16` | `True` | Exports uncompressed 16-bit linear RGB TIFF master (`<out>_linear16.tif`). |
 | `--negative` | `False`| Inverts RGB data for color negative film. |
 | `--gain` | `31` | Analog Front End (AFE) PGA gain (`0x1f`). |
@@ -191,7 +229,25 @@ python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-b
 ```fish
 cd libpie1800u
 make
+
+# High-speed pipelined double-buffered scan (default)
 ./pie1800_cli 950 1250 c_scan_output.ppm
+
+# Legacy synchronous scan
+./pie1800_cli 950 1250 c_scan_output.ppm --sync
+```
+
+#### C Pipelined API
+```c
+#include "pie1800u.h"
+
+// Double-buffered async line delivery via callback
+int on_line(void *user_data, int line_idx, const uint16_t *line_buffer) {
+    // Process 8,100 uint16_t RGB samples (16,200 bytes)
+    return 0; // Return 0 to continue, non-zero to cancel
+}
+
+pie1800_scan_pipelined(dev, 950, 1, on_line, NULL);
 ```
 
 ### SANE Backend Installation

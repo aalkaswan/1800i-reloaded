@@ -21,6 +21,12 @@ try:
 except ImportError:
     HAS_PILLOW = False
 
+try:
+    from pie1800_shading import FlatFieldCalibration, apply_flat_field, load_calibration, calibrate_scanner
+    HAS_SHADING = True
+except ImportError:
+    HAS_SHADING = False
+
 VENDOR_ID = 0x05e3
 PRODUCT_ID = 0x0120
 
@@ -247,6 +253,16 @@ def main():
                         help="PSF blur radius for optical deconvolution (default: 1.25)")
     parser.add_argument("--deconv-iters", type=int, default=8,
                         help="Iterations for Richardson-Lucy deconvolution (default: 8)")
+    parser.add_argument("--chroma-denoise", action="store_true",
+                        help="Apply Chroma-Only Grain-Preserving Denoising to eliminate sensor color speckles")
+    parser.add_argument("--chroma-radius", type=int, default=5,
+                        help="Chroma filter spatial radius (default: 5)")
+    parser.add_argument("--chroma-strength", type=float, default=12.0,
+                        help="Chroma edge-preservation filter strength (default: 12.0)")
+    parser.add_argument("--chroma-space", type=str, default="lab", choices=["lab", "ycbcr"],
+                        help="Color space for chroma decoupling: 'lab' or 'ycbcr' (default: lab)")
+    parser.add_argument("--chroma-filter", type=str, default="bilateral", choices=["bilateral", "guided"],
+                        help="Filter mode: 'bilateral' or 'guided' (default: bilateral)")
     parser.add_argument("--linear16", action="store_true", default=True,
                         help="Save uncompressed 16-bit linear RGB TIFF master for RAW negative grading (default: True)")
     parser.add_argument("--no-linear16", dest="linear16", action="store_false",
@@ -257,6 +273,14 @@ def main():
                         help="Invert colors for negative film")
     parser.add_argument("--stagger", type=int, default=0,
                         help="Row stagger delay between R, G, B channels (default: 0)")
+    parser.add_argument("--shading", type=str, nargs="?", const="auto", default="auto",
+                        help="Flat-field calibration profile path (.json/.bin) or 'auto' (default: auto)")
+    parser.add_argument("--no-shading", dest="shading", action="store_const", const="none",
+                        help="Disable flat-field shading calibration")
+    parser.add_argument("--calibrate-first", action="store_true",
+                        help="Run live dark & white calibration at step 100 before scanning and save profile")
+    parser.add_argument("--shading-filter", choices=["hybrid", "lowpass", "raw"], default="hybrid",
+                        help="Smoothing filter mode across white reference (default: hybrid)")
     parser.add_argument("--out", type=str, default="scan_output",
                         help="Output file prefix (default: scan_output)")
     args = parser.parse_args()
@@ -278,7 +302,9 @@ def main():
     print(f"Exposure      : {args.exposure} clocks | PGA Gain: {args.gain}")
     print(f"Analog Balance: {'Enabled (Blue Boost ~1.75x)' if args.analog_balance else 'Disabled (Uniform Exposure)'}")
     print(f"Deconvolution : {'Enabled (Richardson-Lucy sigma=' + str(args.deconv_sigma) + ')' if args.deconvolve else 'Disabled'}")
+    print(f"Chroma Denoise: {'Enabled (' + args.chroma_space.upper() + ' ' + args.chroma_filter + ' r=' + str(args.chroma_radius) + ' s=' + str(args.chroma_strength) + ')' if args.chroma_denoise else 'Disabled'}")
     print(f"Film Mode     : {'Negative (Inverted)' if args.negative else 'Slide / Transparency (Direct)'}")
+    print(f"Flat-Field    : {'Disabled' if args.shading == 'none' else ('Live Pre-Scan Calibration' if args.calibrate_first else f'Active ({args.shading})')}")
     print("=" * 70)
 
     dev = usb.core.find(idVendor=VENDOR_ID, idProduct=PRODUCT_ID)
@@ -352,6 +378,41 @@ def main():
         retracted = auto_home(dev)
         print(f"[+] Homing complete (retracted {retracted} steps). Docked at HOME.")
 
+    # Flat-Field Calibration Setup
+    shading_profile = None
+    if HAS_SHADING and args.shading != "none":
+        calib_file = None
+        if args.calibrate_first:
+            print("\n[*] Flat-Field Calibration: Running live pre-scan calibration...")
+            calib_file = "shading_calib.json"
+            shading_profile = calibrate_scanner(
+                dev, num_dark=8, num_white=8, dock_step=100,
+                exposure=args.exposure, gain=args.gain,
+                analog_balance=args.analog_balance,
+                filter_mode=args.shading_filter, target_white=65535.0,
+                save_path=calib_file
+            )
+        elif args.shading != "auto":
+            calib_file = args.shading
+        else:
+            repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            candidates = [
+                "shading_calib.json", "shading_calib.bin",
+                os.path.join(repo_root, "shading_calib.json"),
+                os.path.join(repo_root, "shading_calib.bin"),
+            ]
+            for cand in candidates:
+                if os.path.isfile(cand):
+                    calib_file = cand
+                    break
+
+        if calib_file and shading_profile is None and os.path.isfile(calib_file):
+            try:
+                shading_profile = load_calibration(calib_file)
+                print(f"[+] Loaded Flat-Field Calibration Profile: {calib_file}")
+            except Exception as e:
+                print(f"[!] Warning: Failed loading shading calibration {calib_file}: {e}")
+
     print("[*] Step 2: Turning LAMP ON & warming up...")
     asic_write(dev, 0xad, 0x0b)
     asic_write(dev, 0x85, 0x30)
@@ -403,6 +464,12 @@ def main():
             lines_r.append(words[0:2700])
             lines_g.append(words[2700:5400])
             lines_b.append(words[5400:8100])
+
+        if shading_profile is not None:
+            print("[*] Step 5a: Applying Flat-Field Shading Correction (PRNU & DSNU subtraction)...")
+            lines_r, lines_g, lines_b = apply_flat_field(
+                lines_r, lines_g, lines_b, shading_profile, clip=True, out_dtype="uint16"
+            )
 
         def get_channel_bounds(lines, p_low=1, p_high=99):
             sample = []
@@ -511,6 +578,54 @@ def main():
                             print(f"[!] Warning converting deconvolved PPM to PNG: {e}")
             else:
                 print(f"[!] Notice: {deconv_bin} not found. Deconvolution skipped.")
+
+        # Step 5c: Chroma-Only Grain-Preserving Denoising
+        if args.chroma_denoise:
+            repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            chroma_bin = os.path.join(repo_root, "bin", "pie1800_chroma_denoise")
+            ppm_to_denoise = out_ppm
+            if args.deconvolve and 'out_deconv_ppm' in locals() and os.path.isfile(out_deconv_ppm):
+                ppm_to_denoise = out_deconv_ppm
+            elif args.aspect > 1 and img is not None:
+                ppm_to_denoise = f"{out_base}_scaled.ppm"
+                if not os.path.isfile(ppm_to_denoise):
+                    img.save(ppm_to_denoise)
+
+            out_clean_ppm = f"{out_base}_clean.ppm" if not args.deconvolve else f"{out_base}_deconv_clean.ppm"
+            out_clean_png = f"{out_base}_clean.png" if not args.deconvolve else f"{out_base}_deconv_clean.png"
+
+            print(f"\n[*] Step 5c: Applying Chroma-Only Grain-Preserving Denoising ({args.chroma_space.upper()}, radius={args.chroma_radius}, strength={args.chroma_strength})...")
+            if os.path.isfile(chroma_bin):
+                ret = subprocess.run([
+                    chroma_bin, ppm_to_denoise, out_clean_ppm,
+                    str(args.chroma_radius), str(args.chroma_strength),
+                    args.chroma_space, args.chroma_filter
+                ])
+                if ret.returncode == 0:
+                    print(f"[+] Saved Clean PPM: {out_clean_ppm}")
+                    if HAS_PILLOW:
+                        try:
+                            clean_img = Image.open(out_clean_ppm)
+                            clean_img.save(out_clean_png)
+                            print(f"[+] Saved Clean PNG: {out_clean_png}")
+                        except Exception as e:
+                            print(f"[!] Warning converting clean PPM to PNG: {e}")
+            else:
+                try:
+                    sys.path.insert(0, os.path.join(repo_root, "scripts"))
+                    from pie1800_chroma_denoise import denoise_chroma
+                    denoise_chroma(
+                        ppm_to_denoise, out_path=out_clean_ppm,
+                        radius=args.chroma_radius, strength=args.chroma_strength,
+                        colorspace=args.chroma_space, filter_type=args.chroma_filter
+                    )
+                    print(f"[+] Saved Clean PPM: {out_clean_ppm}")
+                    if HAS_PILLOW:
+                        clean_img = Image.open(out_clean_ppm)
+                        clean_img.save(out_clean_png)
+                        print(f"[+] Saved Clean PNG: {out_clean_png}")
+                except Exception as e:
+                    print(f"[!] Warning during chroma denoising: {e}")
 
         # Save raw 16-bit data
         out_bin = f"{out_base}_raw16.bin"

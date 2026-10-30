@@ -78,6 +78,46 @@ bool pie1800_is_home(pie1800_device_t *dev);
 int pie1800_scan_line(pie1800_device_t *dev, uint16_t *buffer);
 
 /**
+ * Callback signature for pipelined scan line delivery.
+ * line_buffer contains PIE1800_LINE_BYTES (8,100 uint16_t words in planar R, G, B order).
+ * Return 0 to continue scanning, non-zero to abort scan.
+ */
+typedef int (*pie1800_line_callback_t)(void *user_data, int line_idx, const uint16_t *line_buffer);
+
+/**
+ * Double-buffered asynchronous pipelined multi-line scan.
+ * Overlaps USB Bulk IN DMA transfers with motor stepping and host processing.
+ *
+ * Automatically:
+ * - Enforces hard rail safety limit (2260 microsteps max travel)
+ * - Arms motor driver in forward direction
+ * - Performs double-buffered USB Bulk IN transfers with libusb_submit_transfer
+ * - Steps motor between lines with low-latency wait_idle verification
+ * - Disarms motor driver with 0x85 -> 0x10 at end of movement
+ *
+ * @param dev Scanner device handle
+ * @param lines Number of scan lines to acquire
+ * @param step_size Stepper microsteps per line (typically 1)
+ * @param callback User callback invoked for each line as soon as acquired
+ * @param user_data Arbitrary context pointer passed to callback
+ * @return 0 on success, negative error code on failure
+ */
+int pie1800_scan_pipelined(pie1800_device_t *dev,
+                           int lines,
+                           int step_size,
+                           pie1800_line_callback_t callback,
+                           void *user_data);
+
+/**
+ * Pipelined multi-line scan storing raw lines into contiguous output buffer.
+ * out_buffer must be at least (lines * PIE1800_LINE_BYTES) bytes.
+ */
+int pie1800_scan_pipelined_buffer(pie1800_device_t *dev,
+                                  int lines,
+                                  int step_size,
+                                  uint16_t *out_buffer);
+
+/**
  * Close scanner, turn lamp off, and release USB interface.
  */
 void pie1800_close(pie1800_device_t *dev);
