@@ -174,6 +174,8 @@ int pie1800_move(pie1800_device_t *dev, uint8_t direction, int steps) {
         }
         usleep(4000); // 4ms inter-chunk delay
     }
+    // Disarm motor driver / enter standby mode
+    pie1800_reg_write(dev, 0x85, 0x10);
     return 0;
 }
 

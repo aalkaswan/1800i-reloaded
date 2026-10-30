@@ -104,6 +104,8 @@ def move_carriage(dev, direction_cmd, steps):
         wait_idle(dev)
         remaining -= chunk
         time.sleep(0.004)
+    # Disarm motor driver / enter standby mode
+    asic_write(dev, 0x85, 0x10)
 
 def capture_line_16bit(dev):
     asic_write(dev, 0x85, 0x12)

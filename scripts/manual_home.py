@@ -90,6 +90,7 @@ def step_backward(dev, steps):
         wait_idle(dev)
         remaining -= chunk
         time.sleep(0.005)
+    asic_write(dev, 0x85, 0x10)
 
 def step_forward(dev, steps):
     """Advances carriage forward in direction 0x16 into bay."""
@@ -102,6 +103,7 @@ def step_forward(dev, steps):
         wait_idle(dev)
         remaining -= chunk
         time.sleep(0.005)
+    asic_write(dev, 0x85, 0x10)
 
 def lamp_off(dev):
     try:

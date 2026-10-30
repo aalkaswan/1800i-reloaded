@@ -68,6 +68,8 @@ def move_steps(dev, direction, steps):
     asic_write(dev, 0x81, steps)
     asic_write(dev, 0x83, 0x01)
     wait_idle(dev)
+    # Disarm motor pulses & return ASIC to standby mode
+    asic_write(dev, 0x85, 0x10)
     time.sleep(0.01)
 
 def print_status(dev, label):
