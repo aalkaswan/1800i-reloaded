@@ -25,9 +25,10 @@ EP_IN = 0x81
 FULL_LINE_BYTES = 16200
 PIXELS_PER_LINE = 2700
 
-# Landmark steps discovered in manufacturer driver (PF1800U.dll)
-STANDARD_FRAME_START = 1708  # ~24.1 mm from home
-STANDARD_FRAME_END   = 4220  # ~59.5 mm from home (4220 - 1708 = 2512 steps = 35.45 mm)
+# Calibrated frame boundaries (optical measurement)
+STANDARD_FRAME_START = 1380  # ~19.5 mm from home (film frame leading edge)
+STANDARD_FRAME_END   = 3830  # ~54.0 mm from home (film frame trailing edge)
+# Factory nominal bounds: 1708 to 4220
 
 def wctl(dev, reg, data, timeout=1000):
     if isinstance(data, int):
@@ -158,10 +159,10 @@ def draw_badge(draw, text, x, y, font, bg_color=(0, 0, 0), text_color=(255, 255,
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Aperture & Offset Calibration Tool (v2.0)")
-    parser.add_argument("--start", type=int, default=1000,
-                        help="Initial steps to advance forward before starting sweep (default: 1000)")
-    parser.add_argument("--travel", type=int, default=3600,
-                        help="Total forward steps to sweep (default: 3600, covering steps 1000..4600)")
+    parser.add_argument("--start", type=int, default=1200,
+                        help="Initial steps to advance forward before starting sweep (default: 1200)")
+    parser.add_argument("--travel", type=int, default=2800,
+                        help="Total forward steps to sweep (default: 2800, covering steps 1200..4000)")
     parser.add_argument("--step-size", type=int, default=4,
                         help="Microsteps per line (default: 4)")
     args = parser.parse_args()

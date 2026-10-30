@@ -151,7 +151,7 @@ SANE_Status sane_pie1800u_open(SANE_String_Const devicename, SANE_Handle *handle
 
     s->line_buf = (uint16_t *)malloc(PIE1800_LINE_BYTES);
     s->converted_line = (uint8_t *)malloc(PIE1800_LINE_PIXELS * 3);
-    s->offset_steps = 1708; // Physical film aperture offset (~24.1 mm)
+    s->offset_steps = 1380; // Calibrated film aperture offset (~19.5 mm)
 
     *handle = (SANE_Handle)s;
     return SANE_STATUS_GOOD;
@@ -221,7 +221,7 @@ SANE_Status sane_pie1800u_get_parameters(SANE_Handle handle, SANE_Parameters *pa
     params->format = SANE_FRAME_RGB;
     params->last_frame = SANE_TRUE;
     params->pixels_per_line = PIE1800_LINE_PIXELS;
-    params->lines = 2512; // Standard 35mm frame length (35.45 mm at 1800 DPI)
+    params->lines = 2450; // Calibrated 35mm frame length (34.6 mm at 1800 DPI)
     params->depth = 8;
     params->bytes_per_line = PIE1800_LINE_PIXELS * 3;
 

@@ -159,10 +159,10 @@ def save_ppm(filename, width, height, rgb_bytes):
 
 def main():
     parser = argparse.ArgumentParser(description="PrimeFilm 1800u / 1800i Native Image Scanner")
-    parser.add_argument("--offset", type=int, default=1708,
-                        help="Initial steps to advance carriage to film aperture (default: 1708 = ~24.1 mm)")
-    parser.add_argument("--lines", type=int, default=2512,
-                        help="Number of lines to scan (default: 2512 lines = 35.45 mm full 35mm frame)")
+    parser.add_argument("--offset", type=int, default=1380,
+                        help="Initial steps to advance carriage to film aperture (calibrated default: 1380 = ~19.5 mm)")
+    parser.add_argument("--lines", type=int, default=2450,
+                        help="Number of lines to scan (calibrated default: 2450 lines = 34.6 mm full 35mm frame)")
     parser.add_argument("--step", type=int, default=1,
                         help="Microsteps per line (default: 1)")
     parser.add_argument("--exposure", type=int, default=2900,
