@@ -273,8 +273,8 @@ def main():
                         help="Invert colors for negative film")
     parser.add_argument("--stagger", type=int, default=0,
                         help="Row stagger delay between R, G, B channels (default: 0)")
-    parser.add_argument("--shading", type=str, nargs="?", const="auto", default="auto",
-                        help="Flat-field calibration profile path (.json/.bin) or 'auto' (default: auto)")
+    parser.add_argument("--shading", type=str, nargs="?", const="none", default="none",
+                        help="Flat-field calibration profile path (.json/.bin) (default: none / disabled)")
     parser.add_argument("--no-shading", dest="shading", action="store_const", const="none",
                         help="Disable flat-field shading calibration")
     parser.add_argument("--calibrate-first", action="store_true",

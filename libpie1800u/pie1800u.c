@@ -369,11 +369,8 @@ int pie1800_scan_pipelined(pie1800_device_t *dev,
 
         // Advance motor 1 microstep to next line (if more lines remain)
         if (l < lines - 1) {
-            pie1800_reg_write(dev, 0x81, (uint8_t)step_size);
-            pie1800_reg_write(dev, 0x83, 0x01);
-            ret = pie1800_wait_idle(dev, 5000);
+            ret = pie1800_move(dev, PIE1800_DIR_FORWARD, step_size);
             if (ret < 0) break;
-            dev->current_position += step_size;
         }
     }
 

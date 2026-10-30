@@ -310,9 +310,7 @@ class PrimeFilmAsyncScanner:
 
                 # 5. Advance stepper motor to next line
                 if line_idx < lines - 1:
-                    asic_write(self.dev, 0x81, step)
-                    asic_write(self.dev, 0x83, 0x01)
-                    wait_idle(self.dev)
+                    move_carriage(self.dev, 0x16, step)
                     self.current_position += step
 
                 if progress_cb:
