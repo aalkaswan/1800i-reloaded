@@ -325,6 +325,8 @@ def main():
                         help="Total Variation regularizer weight (default: 0.03)")
     parser.add_argument("--pixfrac", type=float, default=0.7,
                         help="Drizzle pixel shrinkage factor: 0.1 to 1.0 (default: 0.7)")
+    parser.add_argument("--search-radius", type=int, default=64,
+                        help="Sub-pixel registration search radius in pixels (default: 64)")
     parser.add_argument("--simulate", type=int, default=0, metavar="N",
                         help="Simulate N jittered sub-pixel passes from the first input file")
     parser.add_argument("--linear16", action="store_true", default=True,
@@ -463,6 +465,7 @@ def main():
     env["PIE_SIGMA"] = str(args.sigma)
     env["PIE_TV"] = str(args.tv)
     env["PIE_PIXFRAC"] = str(args.pixfrac)
+    env["PIE_SEARCH_RADIUS"] = str(args.search_radius)
 
     t0 = time.time()
     cmd = [BIN_SUPERRES, out_ppm, args.method] + processed_ppm_inputs

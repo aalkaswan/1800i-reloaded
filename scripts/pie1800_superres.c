@@ -178,15 +178,22 @@ static void estimate_subpixel_shift(const ImagePass *ref, ImagePass *tgt, int se
     double var_ref = sq_ref - sum_ref * mean_ref;
     if (var_ref <= 1e-6) var_ref = 1.0;
 
-    int r = search_radius;
-    int grid_dim = 2 * r + 1;
-    float *corr_grid = (float*)malloc(grid_dim * grid_dim * sizeof(float));
+    int max_ry = (roi_y0 < (h - (roi_y0 + roi_h))) ? roi_y0 - 1 : (h - (roi_y0 + roi_h)) - 1;
+    int max_rx = (roi_x0 < (w - (roi_x0 + roi_w))) ? roi_x0 - 1 : (w - (roi_x0 + roi_w)) - 1;
+    int ry = search_radius;
+    int rx = 16;
+    if (ry > max_ry) ry = max_ry;
+    if (rx > max_rx) rx = max_rx;
+    if (ry < 1) ry = 1;
+    if (rx < 1) rx = 1;
 
-    float best_val = -1e9f;
-    int best_dy = 0, best_dx = 0;
+    int grid_h = 2 * ry + 1;
+    int grid_w = 2 * rx + 1;
+    float *corr_grid = (float*)malloc(grid_h * grid_w * sizeof(float));
 
-    for (int dy = -r; dy <= r; dy++) {
-        for (int dx = -r; dx <= r; dx++) {
+    #pragma omp parallel for collapse(2) schedule(dynamic)
+    for (int dy = -ry; dy <= ry; dy++) {
+        for (int dx = -rx; dx <= rx; dx++) {
             double sum_tgt = 0.0, sq_tgt = 0.0, cross = 0.0;
             for (int y = 0; y < roi_h; y++) {
                 int idx_r = (roi_y0 + y) * w + roi_x0;
@@ -205,8 +212,15 @@ static void estimate_subpixel_shift(const ImagePass *ref, ImagePass *tgt, int se
 
             double cov = cross - sum_ref * mean_tgt;
             float ncc = (float)(cov / sqrt(var_ref * var_tgt));
-            corr_grid[(dy + r) * grid_dim + (dx + r)] = ncc;
+            corr_grid[(dy + ry) * grid_w + (dx + rx)] = ncc;
+        }
+    }
 
+    float best_val = -1e9f;
+    int best_dy = 0, best_dx = 0;
+    for (int dy = -ry; dy <= ry; dy++) {
+        for (int dx = -rx; dx <= rx; dx++) {
+            float ncc = corr_grid[(dy + ry) * grid_w + (dx + rx)];
             if (ncc > best_val) {
                 best_val = ncc;
                 best_dy = dy;
@@ -219,21 +233,25 @@ static void estimate_subpixel_shift(const ImagePass *ref, ImagePass *tgt, int se
     float sub_dy = (float)best_dy;
     float sub_dx = (float)best_dx;
 
-    if (best_dy > -r && best_dy < r && best_dx > -r && best_dx < r) {
-        float c_mid = corr_grid[(best_dy + r) * grid_dim + (best_dx + r)];
-        float c_ym = corr_grid[(best_dy - 1 + r) * grid_dim + (best_dx + r)];
-        float c_yp = corr_grid[(best_dy + 1 + r) * grid_dim + (best_dx + r)];
+    if (best_dy > -ry && best_dy < ry && best_dx > -rx && best_dx < rx) {
+        float c_mid = corr_grid[(best_dy + ry) * grid_w + (best_dx + rx)];
+        float c_ym = corr_grid[(best_dy - 1 + ry) * grid_w + (best_dx + rx)];
+        float c_yp = corr_grid[(best_dy + 1 + ry) * grid_w + (best_dx + rx)];
         float denom_y = (c_ym - 2.0f * c_mid + c_yp);
         if (fabsf(denom_y) > 1e-7f) {
             sub_dy += 0.5f * (c_ym - c_yp) / denom_y;
         }
 
-        float c_xm = corr_grid[(best_dy + r) * grid_dim + (best_dx - 1 + r)];
-        float c_xp = corr_grid[(best_dy + r) * grid_dim + (best_dx + 1 + r)];
+        float c_xm = corr_grid[(best_dy + ry) * grid_w + (best_dx - 1 + rx)];
+        float c_xp = corr_grid[(best_dy + ry) * grid_w + (best_dx + 1 + rx)];
         float denom_x = (c_xm - 2.0f * c_mid + c_xp);
         if (fabsf(denom_x) > 1e-7f) {
             sub_dx += 0.5f * (c_xm - c_xp) / denom_x;
         }
+    }
+
+    if (abs(best_dy) == ry || abs(best_dx) == rx) {
+        fprintf(stderr, "[!] WARNING: Pass registration reached search boundary (dy=%d, dx=%d). Increase search radius.\n", best_dy, best_dx);
     }
 
     free(corr_grid);
@@ -349,7 +367,7 @@ static void forward_projection(const float *hr_blurred, int hr_w, int hr_h,
  * Backward projection: Distribute low-resolution residual error back into high-resolution grid.
  */
 static void backward_projection(const float *lr_err, int lr_w, int lr_h,
-                                float *hr_corr, int hr_w, int hr_h,
+                                float *hr_corr, float *hr_mask, int hr_w, int hr_h,
                                 float shift_x, float shift_y, int scale) {
     #pragma omp parallel for schedule(static)
     for (int hy = 0; hy < hr_h; hy++) {
@@ -357,11 +375,14 @@ static void backward_projection(const float *lr_err, int lr_w, int lr_h,
             // Map HR pixel to LR coordinates with inverse shift
             float lx = ((float)hx + 0.5f) / (float)scale - 0.5f + shift_x;
             float ly = ((float)hy + 0.5f) / (float)scale - 0.5f + shift_y;
+            int idx = hy * hr_w + hx;
 
-            if (lx < 0.0f) lx = 0.0f;
-            if (ly < 0.0f) ly = 0.0f;
-            if (lx >= (float)(lr_w - 1)) lx = (float)(lr_w - 1.001f);
-            if (ly >= (float)(lr_h - 1)) ly = (float)(lr_h - 1.001f);
+            if (lx < 0.0f || ly < 0.0f || lx >= (float)(lr_w - 1) || ly >= (float)(lr_h - 1)) {
+                hr_corr[idx] = 0.0f;
+                if (hr_mask) hr_mask[idx] = 0.0f;
+                continue;
+            }
+            if (hr_mask) hr_mask[idx] = 1.0f;
 
             int x0 = (int)lx;
             int y0 = (int)ly;
@@ -378,7 +399,7 @@ static void backward_projection(const float *lr_err, int lr_w, int lr_h,
 
             float top = e00 * (1.0f - fx) + e10 * fx;
             float bot = e01 * (1.0f - fx) + e11 * fx;
-            hr_corr[hy * hr_w + hx] = top * (1.0f - fy) + bot * fy;
+            hr_corr[idx] = top * (1.0f - fy) + bot * fy;
         }
     }
 }
@@ -399,6 +420,8 @@ static void superres_ibp_channel(ImagePass **passes, int num_passes, int chan_id
     float *lr_err = (float*)malloc(lr_total * sizeof(float));
     float *hr_corr = (float*)malloc(hr_total * sizeof(float));
     float *hr_corr_acc = (float*)malloc(hr_total * sizeof(float));
+    float *hr_weights = (float*)malloc(hr_total * sizeof(float));
+    float *hr_mask = (float*)malloc(hr_total * sizeof(float));
 
     // Initial estimate: Bicubic upsampling of pass 0
     #pragma omp parallel for schedule(static)
@@ -416,6 +439,7 @@ static void superres_ibp_channel(ImagePass **passes, int num_passes, int chan_id
 
     for (int iter = 0; iter < iterations; iter++) {
         memset(hr_corr_acc, 0, hr_total * sizeof(float));
+        memset(hr_weights, 0, hr_total * sizeof(float));
 
         // Forward and backward projection for each low-resolution pass
         for (int p = 0; p < num_passes; p++) {
@@ -433,28 +457,28 @@ static void superres_ibp_channel(ImagePass **passes, int num_passes, int chan_id
                 lr_err[i] = lr_actual[i] - lr_sim[i];
             }
 
-            // Step 4: Back-project error to high-resolution grid
-            backward_projection(lr_err, lr_w, lr_h, hr_corr, hr_w, hr_h,
+            // Step 4: Back-project error to high-resolution grid with field-of-view weighting
+            backward_projection(lr_err, lr_w, lr_h, hr_corr, hr_mask, hr_w, hr_h,
                                 passes[p]->shift_x, passes[p]->shift_y, scale);
 
             // Step 5: Adjoint PSF blur
             gaussian_blur_2d(hr_corr, hr_blurred, hr_w, hr_h, psf_sigma);
 
-            // Accumulate back-projection updates
+            // Accumulate back-projection updates and observation counts
             for (int i = 0; i < hr_total; i++) {
                 hr_corr_acc[i] += hr_blurred[i];
+                hr_weights[i] += hr_mask[i];
             }
         }
 
-        // Apply average gradient update and Total Variation (TV) regularizer
-        float step_size = 1.0f / (float)num_passes;
-
+        // Apply normalized gradient update and Total Variation (TV) regularizer
         #pragma omp parallel for schedule(static)
         for (int y = 1; y < hr_h - 1; y++) {
             int row = y * hr_w;
             for (int x = 1; x < hr_w - 1; x++) {
                 int idx = row + x;
-                float update = hr_corr_acc[idx] * step_size;
+                float w = hr_weights[idx];
+                float update = (w > 0.0f) ? (hr_corr_acc[idx] / w) : 0.0f;
 
                 if (tv_weight > 0.0f) {
                     // Total Variation gradient: div(grad(I) / |grad(I)|)
@@ -477,6 +501,8 @@ static void superres_ibp_channel(ImagePass **passes, int num_passes, int chan_id
     free(lr_err);
     free(hr_corr);
     free(hr_corr_acc);
+    free(hr_weights);
+    free(hr_mask);
 }
 
 /**
@@ -608,12 +634,18 @@ int main(int argc, char **argv) {
     const char *env_pf = getenv("PIE_PIXFRAC");
     if (env_pf) pixfrac = (float)atof(env_pf);
 
+    int search_radius = 64;
+    const char *env_radius = getenv("PIE_SEARCH_RADIUS");
+    if (env_radius) search_radius = atoi(env_radius);
+    if (search_radius < 12) search_radius = 12;
+    if (search_radius > 256) search_radius = 256;
+
     printf("======================================================================\n");
     printf("PRIME FILM 1800u / 1800i COMPUTATIONAL SUPER-RESOLUTION ENGINE\n");
     printf("Reconstruction Method : %s\n", (strcmp(method, "drizzle") == 0) ? "Drizzle (Variable-Pixel Linear)" : "Iterative Back-Projection (IBP-TV)");
     printf("Output Resolution     : %dx Super-Resolution (~%d DPI equivalent)\n", scale, 1800 * scale);
     printf("Input Passes          : %d pass(es)\n", num_passes);
-    printf("PSF Sigma             : %.2f | IBP Iterations: %d | TV Weight: %.4f\n", sigma, iters, tv_weight);
+    printf("PSF Sigma             : %.2f | IBP Iterations: %d | TV Weight: %.4f | Search Radius: %d px\n", sigma, iters, tv_weight, search_radius);
     printf("======================================================================\n");
 
     ImagePass *passes[MAX_PASSES];
@@ -626,7 +658,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         if (i > 0) {
-            estimate_subpixel_shift(passes[0], passes[i], 12);
+            estimate_subpixel_shift(passes[0], passes[i], search_radius);
         }
     }
 
