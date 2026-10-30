@@ -70,8 +70,14 @@ Once EPP Mode `0x80` is established, the host reads and writes the scanner ASIC 
 | `0xe8` | Blue Gain | Analog Front End (AFE) PGA amplifier gain (Blue) |
 | `0xea` | Blue Offset | AFE DAC black-level clamp offset (Blue) |
 
-### D. Bulk Image Line Acquisition
-Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of `0xf000` (61,440 bytes) triggered by writing the transfer descriptor to register `0x82`.
+### D. Bulk Image Line Acquisition & Sensor Architecture
+Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of **16,200 bytes** (`0x3F48`) triggered by writing the transfer descriptor to register `0x82`:
+- **Sensor geometry**: 2,700 physical optical pixels across the 1.5-inch active aperture at 1,800 DPI.
+- **Color format**: Interleaved RGB triplets (R, G, B, R, G, B...).
+- **Bit depth**: 14-bit linear ADC packed as Little-Endian `uint16_t` words shifted left by 2 bits (`x << 2`, multiples of 4).
+- **Line buffer size**: 2,700 pixels $\times$ 3 channels $\times$ 2 bytes = **16,200 bytes** (8,100 `uint16_t` samples).
+- **CCD Sampling Gate Clocks**: Registers `0x98=0x01, 0x99=0x00, 0x9a=0x8d, 0x9b=0x2a` configure internal pixel sampling timing.
+- **Carriage Stepper Polarity**: Register `0x85 = 0x16` steps forward into film bay; `0x85 = 0x14` retracts to home dock.
 
 ---
 
@@ -81,25 +87,23 @@ Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of `0xf000` (6
 1800i-reloaded/
 ├── README.md                      # This documentation
 ├── cyberview_protocol.md          # Technical disassembly analysis of PF1800U.dll
-├── bin/
-│   └── vuescan-1800i-patched      # 32-bit Linux binary patched to bypass PID rejection in pie2_usup
-├── decomp/
-│   ├── pie2_common.h              # Unified header with complete PIE2_T struct (17,466,260 bytes)
-│   ├── test_offsets.cpp           # Struct layout & offset verification test
-│   ├── pie2_core.cpp              # 33 native driver core methods (alloc, open, close, calibration)
-│   ├── pie2_rlin.cpp              # 4-channel RGBI line readout with 16-bit channel scaling
-│   ├── pie2_lsca.cpp              # Scan geometry, line deinterleaving, exposure compensation
-│   ├── pie2_scan_engine.cpp       # Scan coordination, autofocus, optical calibration loops
-│   ├── pied.cpp                   # 59 complete SCSI CDB command packet builders
-│   ├── pie1.cpp                   # Legacy CyberView plugin wrapper stubs
-│   ├── usbi_gl_bridge.cpp         # Genesys Logic GL640/GL646 USB transport layer
-│   └── *.o                        # Precompiled 32-bit ELF object files
+├── libpie1800u/                   # Standalone native C driver library
+│   ├── pie1800u.h                 # Driver API header
+│   ├── pie1800u.c                 # libusb-1.0 hardware implementation
+│   ├── pie1800_cli.c              # Lightweight C acquisition CLI
+│   └── Makefile                   # Builds libpie1800u.so, libpie1800u.a, pie1800_cli
+├── sane-backend/                  # SANE scanner backend (sane-pie1800u)
+│   ├── sane-pie1800u.h            # SANE API interface & types
+│   ├── sane-pie1800u.c            # SANE backend driver implementation
+│   ├── pie1800u.conf              # SANE daemon device configuration
+│   └── Makefile                   # Builds libsane-pie1800u.so.1
 ├── scripts/
+│   ├── pie1800_scan.py            # High-resolution image scanner with auto-positioning & PNG/PPM export
+│   ├── test_full_line_16200.py    # 16,200-byte 16-bit uint16 optical line readout benchmark
+│   ├── test_sram_read.py          # CCD sampling gate & dark vs light modulation test
+│   ├── interactive_jog_and_scan.py# Interactive carriage jogger & optical test console
+│   ├── test_motor_jog.py          # Stepper motor distance & speed verification
 │   ├── test_cyberview_asic.py     # Live hardware ASIC register reader & 3-stage handshake
-│   ├── safe_gl_check.py           # Safe non-stalling hardware query via GL indirect registers
-│   ├── test_inquiry_after_8b.py   # Transceiver enable (0x8b) and IEEE 1284.4 handshake test
-│   ├── diag_gl_regs.py            # Comprehensive bridge register diagnostics
-│   ├── probe_1800i.py             # Low-level SCSI / IEEE inquiry probe
 │   └── 60-vuescan.rules           # Udev rule for non-root USB access
 └── windows_driver/                # Extracted official Pacific Image CyberView components
     ├── PF1800U.dll                # Core hardware driver DLL (exports ScannerDeviceIO)
@@ -113,14 +117,29 @@ Image data is acquired over Bulk IN Endpoint 1 (`0x81`) in chunks of `0xf000` (6
 
 ---
 
-## 4. Testing the ASIC on Real Hardware
+## 4. Hardware Acquisition & Scanning
 
-Run the new CyberView ASIC test tool against the physical scanner:
+### A. Scanning Full Images with Python
+To acquire a high-resolution scan (e.g. 150 lines starting at aperture offset):
 ```fish
-python3 ~/Desktop/1800i-reloaded/scripts/test_cyberview_asic.py
+python3 ~/Desktop/1800i-reloaded/scripts/pie1800_scan.py --offset 2000 --lines 150 --out test_scan
 ```
-This script:
-1. Enables the GL640USB transceiver on register `0x8b`.
-2. Executes the genuine 3-stage CyberView handshake (Modes `0x30` $\rightarrow$ `0x00` $\rightarrow$ `0x80`).
-3. Reads the live ASIC exposure, gain, offset, and status registers without hanging.
-4. Performs a safe write and readback verification test on the Red PGA Gain register (`0xe0`).
+Options:
+- `--offset <steps>`: Advance carriage to active film holder (default: 2000 steps = ~28.2 mm).
+- `--lines <N>`: Number of lines to scan (e.g. 1800 lines for a full 1-inch frame).
+- `--negative`: Invert colors for color negative film.
+- `--out <name>`: Base filename for output `.png`, `.ppm`, and `_raw16.bin`.
+
+### B. Building & Running the Native C Driver Library
+```fish
+cd ~/Desktop/1800i-reloaded/libpie1800u
+make
+./pie1800_cli 100 2000 c_scan_preview.ppm
+```
+
+### C. Building the SANE Backend
+```fish
+cd ~/Desktop/1800i-reloaded/sane-backend
+make
+sudo make install
+```
