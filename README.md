@@ -149,6 +149,11 @@ The PrimeFilm 1800u/1800i utilizes a **Selfoc / Gradient-Index (GRIN) rod-lens a
 
 ![Spatially-Varying LCA Guided Deconvolution Comparison](docs/images/comparison_lca_deconv.png)
 
+#### Full-Frame 35mm Master Photograph LCA Correction
+Full photographic frame comparison demonstrating the simultaneous compensation of rod-lens peripheral field curvature and radial lateral chromatic fringing across high-contrast silver halide edges:
+
+![Full Frame Master LCA Deconvolution Comparison](docs/images/comparison_lca_deconv_ultimate.png)
+
 | Optical Mode | Edge Acutance (Max Slope) | Chromatic Misalignment (R-G) | Peripheral Acutance | Visual Clarity |
 | :--- | :--- | :--- | :--- | :--- |
 | **1. Raw Optical Scan** | `72.87` (baseline) | `0.264 px` (fringed) | `72.90` (soft edges) | Visible color fringing on high-contrast edges; soft rod lens blur. |
@@ -184,19 +189,37 @@ While the GL640 USB bridge ASIC and stepper motor logic operate with discrete in
 | **IBP-TV (Iterative Back-Projection)** | Inverts optical PSF model iteratively with Total Variation regularization | **High (+10% to +48%)** | Clean photographic gradients, suppressed noise, edge-preserving smooth tone | Archival photo masters, portraits, smooth skies & gradients |
 | **Variable-Pixel Drizzle (`pixfrac=0.7`)** | Drops shrunk sub-pixel footprints linearly onto high-res grid (Hubble algorithm) | **Ultra-High (+163%)** | Crisp individual silver halide grain definition, zero blur smearing | Fine technical line art, dense film grain, high-contrast text |
 
+#### Live Multi-Pass Hysteresis Registration & Boundary Masking
+Comparison showing the elimination of multi-pass registration blur caused by mechanical carriage hysteresis and lead-screw backlash:
+- **1. Single Pass 2× Lanczos**: Soft motor-axis interpolation baseline.
+- **2. Unregistered Multi-Pass**: Narrow-search registration failure causing phase smearing and severe double-edge blur.
+- **3. 64-Pixel NCC + TV Super-Resolution**: Expanded search radius with boundary masking eliminates phase blur, aligning silver halide grains into crisp, razor-sharp focus.
+
+![Live Hardware Sub-Pixel Alignment Comparison](docs/images/comparison_live_fix.png)
+
 ### I. Multi-Exposure Analog Bracketed HDR & Film Dmax Extender (Dmax > 3.8)
 By unlocking the 24-bit ASIC exposure limits (`0xa2..0xaa -> 0xff`), the integration counter is expanded to over 16 million clocks. Multi-exposure analog bracketing captures a wide dynamic range sequence at each carriage step, extracting deep shadow details through dense negative masks that are normally lost below the 14-bit ADC noise floor.
 
-Per-bracket dark frames ($D_k(x)$, lamp OFF) eliminate thermal DSNU drift before blending via Poisson-optimal radiance recovery and Mertens exposure fusion:
+#### Hardware Sensitometric Artifact Fix: Optical Black Referencing & ASIC Gate Timing
+Previous uncalibrated multi-exposure acquisitions suffered from vertical color striping caused by two physical sensor phenomena:
+1. **Lamp-OFF CDS Bias Collapse & ADC Ceiling Clamping (4095 counts)**: Turning the fluorescent lamp off for dark frames caused the CDS reference to float, clamping 96.3% of the sensels at 4095 and injecting +891-count (+42%) step discontinuities (e.g., Column 1599 $\Delta G = +115.4$).
+2. **ASIC Transfer Gate Cutoff (<2800 clocks)**: Integration times below 2800 clocks truncated the Blue channel readout gate, dumping reset voltage (~3400 counts) into Blue while Red and Green read normally.
+
+`pie1800_hdr.py` resolves this via **live dynamic optical black referencing** (extracting $V_{\text{OB}} \approx 1854$ from physical aluminum-masked sensels 10..40 on every line), safe continuous integration timing (`[2800, 3100, 3500]` clocks), and independent per-channel percentile normalization for negative film:
+
+![HDR Streak Fix Comparison Showcase](docs/images/comparison_hdr_streak_fix.png)
+
+#### Multi-Exposure Bracketed HDR Master Showcase
+Streak-free multi-exposure fusion comparing the single-exposure baseline against Debevec/Poisson linear radiance recovery (Filmic ACES tonemapped) and Mertens multi-scale exposure fusion:
+
+![Multi-Exposure Analog Bracketed HDR Comparison Matrix](docs/images/comparison_bracketed_hdr.png)
 
 | Exposure Bracket Set (Clocks) | Exposure Ratio | EV Gain ($\Delta\text{EV}$) | Dynamic Range Gain | Effective Film $D_{\text{max}}$ | Visual Dynamic Range Impact |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Baseline Single Exposure** (`2900`) | $1.0\times$ | $+0.00\text{ EV}$ | $0.00\text{ dB}$ | $2.49\text{ D}$ | Standard capture; shadow tones in dense negative masks clip or quantize. |
-| **Standard 3-Bracket** (`1450, 2900, 5800`) | $4.0\times$ | **$+2.00\text{ EV}$** | **$+12.04\text{ dB}$** | **$3.09\text{ D}$** | Preserves highlights while penetrating typical film base orange mask. |
-| **Extended 4-Bracket** (`1000, 2900, 5800, 11600`) | $11.6\times$ | **$+3.54\text{ EV}$** | **$+21.29\text{ dB}$** | **$3.55\text{ D}$** | Full archival dynamic range; extracts deep shadow micro-detail with zero clipping. |
-| **Ultra-Dmax 5-Bracket** (`1000, 2900, 5800, 11600, 23200`) | $23.2\times$ | **$+4.54\text{ EV}$** | **$+27.31\text{ dB}$** | **$3.86\text{ D}$** | Maximum optical density; unlocks effective **17.54 EV** total system dynamic range. |
-
-![Multi-Exposure Analog Bracketed HDR Comparison Matrix](docs/images/comparison_bracketed_hdr.png)
+| **Standard 3-Bracket** (`2800, 3100, 3500`) | $1.25\times$ | **$+0.32\text{ EV}$** | **$+1.94\text{ dB}$** | **$2.59\text{ D}$** | Zero-clipping safe continuous integration; pristine neutral color balance. |
+| **Extended 4-Bracket** (`2800, 3100, 3400, 3800`) | $1.36\times$ | **$+0.44\text{ EV}$** | **$+2.66\text{ dB}$** | **$2.62\text{ D}$** | Full linear shadow penetration across dense negative mask without gate cutoff. |
+| **Archival Deep Dmax** (`2800, 3200, 3700, 4200`) | $1.50\times$ | **$+0.58\text{ EV}$** | **$+3.52\text{ dB}$** | **$2.67\text{ D}$** | Deep shadow extraction; pulls low-transmission highlights out of ADC noise floor. |
 
 ---
 
@@ -323,13 +346,13 @@ PIE_SCALE=2 PIE_ITERS=8 ./bin/pie1800_superres output_superres.ppm ibp pass1.ppm
 ```
 
 #### 8. Multi-Exposure Analog Bracketed HDR (Live Hardware)
-Captures multi-bracket exposure sequences on live hardware (`0x9c..0xa1`), subtracting matching dark-frame DSNU before Poisson-optimal linear radiance recovery and Mertens exposure fusion:
+Captures multi-bracket exposure sequences on live hardware (`0x9c..0xa1`), using dynamic optical black referencing and safe continuous integration timing before Poisson-optimal linear radiance recovery and Mertens exposure fusion:
 ```fish
-# 3-Bracket HDR Scan (1450, 2900, 5800 clocks) with Filmic ACES + Mertens Fusion
-python3 scripts/pie1800_hdr.py --offset 1250 --lines 950 --brackets 1450,2900,5800 --fusion both --tonemap filmic --negative --out scan_hdr_master
+# 3-Bracket Clean Streak-Free HDR Scan (2800, 3100, 3500 clocks) with Filmic ACES + Mertens Fusion
+python3 scripts/pie1800_hdr.py --offset 1250 --lines 950 --brackets 2800,3100,3500 --fusion both --tonemap filmic --negative --out scan_hdr_master_clean
 
-# Ultra-Dmax 4-Bracket Scan with Guided Optical Deconvolution & Chroma Denoising
-python3 scripts/pie1800_hdr.py --offset 1250 --lines 950 --brackets 1000,2900,5800,11600 --deconvolve --chroma-denoise --negative --out scan_hdr_ultra
+# Extended 4-Bracket Scan with Guided Optical Deconvolution & Chroma Denoising
+python3 scripts/pie1800_hdr.py --offset 1250 --lines 950 --brackets 2800,3100,3400,3800 --deconvolve --chroma-denoise --negative --out scan_hdr_ultra
 
 # Offline validation & unit test suite
 python3 scripts/test_pie1800_hdr.py

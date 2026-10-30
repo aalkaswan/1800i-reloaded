@@ -42,8 +42,8 @@ def draw_badge(draw, x, y, text, bg_color, text_color=(255, 255, 255)):
 
 def main():
     p_base = os.path.join(REPO_ROOT, "scan_fast_clean_scaled.ppm")
-    p_lin = os.path.join(REPO_ROOT, "scan_hdr_master_linear_tonemapped.png")
-    p_mer = os.path.join(REPO_ROOT, "scan_hdr_master_mertens.png")
+    p_lin = os.path.join(REPO_ROOT, "scan_hdr_master_clean_linear_tonemapped.png")
+    p_mer = os.path.join(REPO_ROOT, "scan_hdr_master_clean_mertens.png")
 
     if not os.path.isfile(p_base) or not os.path.isfile(p_lin) or not os.path.isfile(p_mer):
         print(f"Error: Missing required files:\n  Base: {p_base}\n  Linear: {p_lin}\n  Mertens: {p_mer}")
@@ -93,7 +93,7 @@ def main():
     draw_header(
         draw,
         "PRIME FILM 1800u / 1800i MULTI-EXPOSURE BRACKETED HDR SHOWCASE",
-        "Physical 3-Bracket Acquisition [1450, 2900, 5800 Clocks]: +2.0 EV Dynamic Range Extension & Dmax 3.09 D",
+        "Physical 3-Bracket Acquisition [2800, 3100, 3500 Clocks]: Streak-Free Optical Black Referencing & Dmax Extension",
         total_w
     )
 
