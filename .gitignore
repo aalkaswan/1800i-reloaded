@@ -1,7 +1,9 @@
 *.bin
 *.ppm
 *.png
+*.tif
 *.o
 *.a
 *.so*
+bin/
 pie1800_cli

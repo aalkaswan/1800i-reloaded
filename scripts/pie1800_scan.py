@@ -11,6 +11,7 @@ import os
 import time
 import struct
 import argparse
+import subprocess
 import usb.core
 import usb.util
 
@@ -151,24 +152,105 @@ def capture_line_16bit(dev):
     raw = bytes(dev.read(EP_IN, FULL_LINE_BYTES, timeout=4000))
     return raw
 
+def capture_line_multisample(dev, num_samples=1):
+    """
+    Temporal multi-exposure stacking: averages N exposures at the same carriage position.
+    Reduces thermal and shot noise by sqrt(N), expanding effective dynamic range by ~log2(sqrt(N)) bits.
+    """
+    if num_samples <= 1:
+        return capture_line_16bit(dev)
+
+    first = capture_line_16bit(dev)
+    n_words = len(first) // 2
+    acc = list(struct.unpack(f"<{n_words}H", first))
+
+    for _ in range(num_samples - 1):
+        nxt = capture_line_16bit(dev)
+        words = struct.unpack(f"<{n_words}H", nxt)
+        for i in range(n_words):
+            acc[i] += words[i]
+
+    for i in range(n_words):
+        acc[i] //= num_samples
+
+    return struct.pack(f"<{n_words}H", *acc)
+
 def save_ppm(filename, width, height, rgb_bytes):
     with open(filename, "wb") as f:
         header = f"P6\n{width} {height}\n255\n".encode("ascii")
         f.write(header)
         f.write(rgb_bytes)
 
+def save_tiff_rgb16(filename, width, height, r_lines, g_lines, b_lines):
+    """
+    Writes uncompressed 16-bit linear RGB TIFF master without quantization loss,
+    preserving full 14-bit ADC dynamic range for external RAW negative grading tools
+    (e.g., Negative Lab Pro, RawTherapee, Darktable).
+    """
+    data = bytearray(width * height * 6)
+    idx = 0
+    for y in range(height):
+        ry = r_lines[y]
+        gy = g_lines[y]
+        by = b_lines[y]
+        for x in range(width):
+            struct.pack_into('<HHH', data, idx, ry[x], gy[x], by[x])
+            idx += 6
+
+    header = b'II\x2a\x00\x08\x00\x00\x00'
+    # IFD: 10 tags
+    tags = [
+        (0x0100, 4, 1, width),                   # ImageWidth
+        (0x0101, 4, 1, height),                  # ImageLength
+        (0x0102, 3, 3, 134),                     # BitsPerSample -> [16, 16, 16] at offset 134
+        (0x0103, 3, 1, 1),                       # Compression: None
+        (0x0106, 3, 1, 2),                       # PhotometricInterpretation: RGB
+        (0x0111, 4, 1, 140),                     # StripOffsets -> image data at offset 140
+        (0x0115, 3, 1, 3),                       # SamplesPerPixel: 3
+        (0x0116, 4, 1, height),                  # RowsPerStrip: height
+        (0x0117, 4, 1, len(data)),               # StripByteCounts
+        (0x011c, 3, 1, 1),                       # PlanarConfiguration: Chunky
+    ]
+
+    ifd = bytearray()
+    ifd.extend(struct.pack('<H', len(tags)))
+    for tag, dtype, count, val in tags:
+        ifd.extend(struct.pack('<HHII', tag, dtype, count, val))
+    ifd.extend(struct.pack('<I', 0))
+    extra = struct.pack('<HHH', 16, 16, 16)
+
+    with open(filename, 'wb') as f:
+        f.write(header)
+        f.write(ifd)
+        f.write(extra)
+        f.write(data)
+
 def main():
     parser = argparse.ArgumentParser(description="PrimeFilm 1800u / 1800i Native Image Scanner")
     parser.add_argument("--offset", type=int, default=1250,
                         help="Initial steps to advance carriage to film aperture (default: 1250)")
-    parser.add_argument("--lines", type=int, default=980,
-                        help="Number of motor lines to scan (default: 980 lines = 2230 max steps)")
+    parser.add_argument("--lines", type=int, default=950,
+                        help="Number of motor lines to scan (default: 950 lines = 2200 max steps)")
     parser.add_argument("--aspect", type=int, default=2,
                         help="Vertical aspect ratio scaling multiplier (default: 2 for 900 DPI motor pitch)")
     parser.add_argument("--step", type=int, default=1,
                         help="Microsteps per line (default: 1)")
+    parser.add_argument("--samples", type=int, default=1,
+                        help="Multi-exposure temporal stacking: exposures per line to average for noise reduction (e.g. 2, 4, 8; default: 1)")
     parser.add_argument("--exposure", type=int, default=2900,
                         help="CCD integration time clocks (default: 2900 = 0x0b54)")
+    parser.add_argument("--analog-balance", action="store_true",
+                        help="Enable hardware analog color balancing (boosts Blue integration time to balance dense orange mask)")
+    parser.add_argument("--deconvolve", action="store_true",
+                        help="Apply Richardson-Lucy optical MTF deconvolution to restore lens sharpness")
+    parser.add_argument("--deconv-sigma", type=float, default=1.25,
+                        help="PSF blur radius for optical deconvolution (default: 1.25)")
+    parser.add_argument("--deconv-iters", type=int, default=8,
+                        help="Iterations for Richardson-Lucy deconvolution (default: 8)")
+    parser.add_argument("--linear16", action="store_true", default=True,
+                        help="Save uncompressed 16-bit linear RGB TIFF master for RAW negative grading (default: True)")
+    parser.add_argument("--no-linear16", dest="linear16", action="store_false",
+                        help="Disable 16-bit linear TIFF export")
     parser.add_argument("--gain", type=int, default=31,
                         help="AFE PGA gain (default: 31 = 0x1f)")
     parser.add_argument("--negative", action="store_true",
@@ -192,7 +274,10 @@ def main():
     print(f"Optical Width : {PIXELS_PER_LINE} pixels (RGB Interleaved, 16-bit ADC)")
     print(f"Scan Lines    : {args.lines} lines | Step Size: {args.step} microsteps")
     print(f"Aperture Offset: {args.offset} steps (~{args.offset * 25.4 / 1800:.1f} mm)")
+    print(f"Temporal Stacking: {args.samples}x exposure(s) per line")
     print(f"Exposure      : {args.exposure} clocks | PGA Gain: {args.gain}")
+    print(f"Analog Balance: {'Enabled (Blue Boost ~1.75x)' if args.analog_balance else 'Disabled (Uniform Exposure)'}")
+    print(f"Deconvolution : {'Enabled (Richardson-Lucy sigma=' + str(args.deconv_sigma) + ')' if args.deconvolve else 'Disabled'}")
     print(f"Film Mode     : {'Negative (Inverted)' if args.negative else 'Slide / Transparency (Direct)'}")
     print("=" * 70)
 
@@ -226,12 +311,23 @@ def main():
     cyberview_init(dev)
     configure_hardware(dev)
 
-    # Set integration times
-    exp_lsb = args.exposure & 0xff
-    exp_msb = (args.exposure >> 8) & 0xff
-    for r_lsb, r_msb in [(0x9c, 0x9d), (0x9e, 0x9f), (0xa0, 0xa1)]:
-        asic_write(dev, r_lsb, exp_lsb)
-        asic_write(dev, r_msb, exp_msb)
+    # Set integration times (per-channel)
+    if args.analog_balance:
+        # Boost Blue integration time to balance the dense orange negative mask
+        # Orange mask has OD ~0.7 in Blue vs ~0.15 in Red, so Blue requires ~1.75x longer exposure
+        exp_r = int(args.exposure * 0.9)
+        exp_g = int(args.exposure * 1.0)
+        exp_b = int(args.exposure * 1.75)
+        print(f"[*] Analog Exposure Balancing Active: Red={exp_r}, Green={exp_g}, Blue={exp_b}")
+    else:
+        exp_r = exp_g = exp_b = args.exposure
+
+    asic_write(dev, 0x9c, exp_r & 0xff)
+    asic_write(dev, 0x9d, (exp_r >> 8) & 0xff)
+    asic_write(dev, 0x9e, exp_g & 0xff)
+    asic_write(dev, 0x9f, (exp_g >> 8) & 0xff)
+    asic_write(dev, 0xa0, exp_b & 0xff)
+    asic_write(dev, 0xa1, (exp_b >> 8) & 0xff)
 
     # Set gains and offsets
     for r in [0xe0, 0xe4, 0xe8]:
@@ -274,8 +370,8 @@ def main():
         all_lines_16bit = []
         try:
             for line_num in range(args.lines):
-                # Capture line
-                raw_line = capture_line_16bit(dev)
+                # Capture line with optional temporal multi-exposure stacking
+                raw_line = capture_line_multisample(dev, num_samples=args.samples)
                 all_lines_16bit.append(raw_line)
 
                 # Advance motor
@@ -367,21 +463,54 @@ def main():
         if os.path.isabs(args.out):
             out_base = args.out
         else:
-            out_base = os.path.join("/home/aalkaswan/Desktop/1800i-reloaded", args.out)
+            out_base = os.path.abspath(args.out)
 
         out_ppm = f"{out_base}.ppm"
         save_ppm(out_ppm, PIXELS_PER_LINE, valid_lines, bytes(rgb_8bit))
         print(f"[+] Saved Reconstructed RGB PPM: {out_ppm}")
 
+        img = None
         if HAS_PILLOW:
             out_png = f"{out_base}.png"
             img = Image.frombytes("RGB", (PIXELS_PER_LINE, valid_lines), bytes(rgb_8bit))
             if args.aspect > 1:
                 target_height = valid_lines * args.aspect
-                img = img.resize((PIXELS_PER_LINE, target_height), Image.Resampling.BILINEAR)
-                print(f"[*] Applied {args.aspect}x optical aspect correction -> {PIXELS_PER_LINE}x{target_height}")
+                img = img.resize((PIXELS_PER_LINE, target_height), Image.Resampling.LANCZOS)
+                print(f"[*] Applied {args.aspect}x optical aspect correction (Lanczos) -> {PIXELS_PER_LINE}x{target_height}")
             img.save(out_png)
             print(f"[+] Saved Reconstructed RGB PNG: {out_png}")
+
+        # Save 16-bit Linear Pro TIFF master
+        if args.linear16:
+            out_tif = f"{out_base}_linear16.tif"
+            save_tiff_rgb16(out_tif, PIXELS_PER_LINE, valid_lines, lines_r, lines_g, lines_b)
+            print(f"[+] Saved 16-bit Linear Pro TIFF: {out_tif}")
+
+        # Optical Point Spread Function (PSF) Deconvolution
+        if args.deconvolve:
+            repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            deconv_bin = os.path.join(repo_root, "bin", "pie1800_deconv")
+            if os.path.isfile(deconv_bin):
+                out_deconv_ppm = f"{out_base}_deconv.ppm"
+                out_deconv_png = f"{out_base}_deconv.png"
+                print(f"\n[*] Step 5b: Applying Richardson-Lucy Optical Deconvolution (sigma={args.deconv_sigma}, iters={args.deconv_iters})...")
+                # Deconvolve the aspect-scaled image if aspect > 1 or the base PPM
+                ppm_to_deconv = out_ppm
+                if args.aspect > 1 and img is not None:
+                    ppm_to_deconv = f"{out_base}_scaled.ppm"
+                    img.save(ppm_to_deconv)
+                ret = subprocess.run([deconv_bin, ppm_to_deconv, out_deconv_ppm, str(args.deconv_sigma), str(args.deconv_iters)])
+                if ret.returncode == 0:
+                    print(f"[+] Saved Deconvolved PPM: {out_deconv_ppm}")
+                    if HAS_PILLOW:
+                        try:
+                            dec_img = Image.open(out_deconv_ppm)
+                            dec_img.save(out_deconv_png)
+                            print(f"[+] Saved Deconvolved PNG: {out_deconv_png}")
+                        except Exception as e:
+                            print(f"[!] Warning converting deconvolved PPM to PNG: {e}")
+            else:
+                print(f"[!] Notice: {deconv_bin} not found. Deconvolution skipped.")
 
         # Save raw 16-bit data
         out_bin = f"{out_base}_raw16.bin"
