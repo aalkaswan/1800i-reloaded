@@ -126,11 +126,22 @@ def capture_line_16bit(dev):
     return raw
 
 def main():
-    START_OFFSET = 400     # Start before aperture (5.6 mm)
-    TOTAL_TRAVEL = 2200    # Total carriage travel (31 mm, max step 2600)
-    STEP_SIZE = 4          # 4 microsteps per preview line (fast acquisition)
-    NUM_LINES = TOTAL_TRAVEL // STEP_SIZE  # 550 lines
-    MAX_CARRIAGE_STEPS = 2700  # Hard physical ceiling of the 35mm film chamber
+    import argparse
+    parser = argparse.ArgumentParser(description="Aperture & Offset Calibration Tool")
+    parser.add_argument("--start", type=int, default=300,
+                        help="Initial steps to advance forward before starting sweep (default: 300)")
+    parser.add_argument("--travel", type=int, default=2100,
+                        help="Total forward steps to sweep (default: 2100)")
+    parser.add_argument("--step-size", type=int, default=4,
+                        help="Microsteps per line (default: 4)")
+    parser.add_argument("--home-first", action="store_true",
+                        help="Retract to home bumper before starting (only use if carriage is out in the bay)")
+    args = parser.parse_args()
+
+    START_OFFSET = args.start
+    TOTAL_TRAVEL = args.travel
+    STEP_SIZE = args.step_size
+    NUM_LINES = TOTAL_TRAVEL // STEP_SIZE
 
     print("=" * 70)
     print("PRIME FILM 1800u / 1800i APERTURE & OFFSET CALIBRATION TOOL")
@@ -167,11 +178,10 @@ def main():
     cyberview_init(dev)
     configure_hardware(dev)
 
-    # Step 0: Mandatory Auto-Homing
-    # Retract carriage to ensure we start precisely at step 0
-    print("[*] Step 0: Homing carriage to mechanical dock (position 0)...")
-    move_carriage(dev, 0x14, 2800)
-    print("[+] Carriage confirmed at HOME (Step 0).")
+    if args.home_first:
+        print("[*] Homing carriage backward to dock (500 steps)...")
+        move_carriage(dev, 0x14, 500)
+        print("[+] Homing nudge complete.")
 
     # Fast integration (1500 clocks)
     for r_lsb, r_msb in [(0x9c, 0x9d), (0x9e, 0x9f), (0xa0, 0xa1)]:
