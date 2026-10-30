@@ -238,6 +238,14 @@ def main():
     asic_write(dev, 0x9a, 0x8d)
     asic_write(dev, 0x9b, 0x2a)
 
+    # Optical Home Sensor Check & Alignment
+    if is_home(dev):
+        print("[+] Optical Home Sensor: Carriage is currently docked at HOME (Step 0).")
+    else:
+        print("[*] Optical Home Sensor: Aligning carriage to optical home stop...")
+        retracted = auto_home(dev)
+        print(f"[+] Homing complete (retracted {retracted} steps). Docked at HOME.")
+
     print("[*] Step 2: Turning LAMP ON & warming up...")
     asic_write(dev, 0xad, 0x0b)
     asic_write(dev, 0x85, 0x30)
@@ -254,22 +262,30 @@ def main():
         t_start = time.time()
 
         all_lines_16bit = []
-        for line_num in range(args.lines):
-            # Capture line
-            raw_line = capture_line_16bit(dev)
-            all_lines_16bit.append(raw_line)
+        try:
+            for line_num in range(args.lines):
+                # Capture line
+                raw_line = capture_line_16bit(dev)
+                all_lines_16bit.append(raw_line)
 
-            # Advance motor
-            move_carriage(dev, 0x16, args.step)
-            total_steps_moved += args.step
+                # Advance motor
+                move_carriage(dev, 0x16, args.step)
+                total_steps_moved += args.step
 
-            if (line_num + 1) % 25 == 0 or line_num == args.lines - 1:
-                elapsed = time.time() - t_start
-                rate = (line_num + 1) / elapsed if elapsed > 0 else 0
-                print(f"    Line {line_num + 1:4d}/{args.lines} captured ({rate:.1f} lines/s)")
+                if (line_num + 1) % 25 == 0 or line_num == args.lines - 1:
+                    elapsed = time.time() - t_start
+                    rate = (line_num + 1) / elapsed if elapsed > 0 else 0
+                    print(f"    Line {line_num + 1:4d}/{args.lines} captured ({rate:.1f} lines/s)")
+        except KeyboardInterrupt:
+            print(f"\n[!] Interrupted by user! Saving {len(all_lines_16bit)} lines scanned so far...")
+
+        actual_lines = len(all_lines_16bit)
+        if actual_lines == 0:
+            print("[!] No lines captured.")
+            return
 
         total_elapsed = time.time() - t_start
-        print(f"[+] All {args.lines} lines captured in {total_elapsed:.1f}s ({args.lines / total_elapsed:.1f} lines/s)!")
+        print(f"[+] {actual_lines} lines acquired in {total_elapsed:.1f}s ({actual_lines / max(total_elapsed, 0.001):.1f} lines/s)!")
 
         print("\n[*] Step 5: Post-processing planar optical data (2,700 px x 3 channels)...")
         lines_r = []
@@ -306,9 +322,9 @@ def main():
 
         # Stagger row adjustment
         s = args.stagger
-        valid_lines = args.lines - 2 * abs(s) if s != 0 else args.lines
+        valid_lines = actual_lines - 2 * abs(s) if s != 0 else actual_lines
         if valid_lines <= 0:
-            valid_lines = args.lines
+            valid_lines = actual_lines
             s = 0
 
         rgb_8bit = bytearray()
