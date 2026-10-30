@@ -699,28 +699,36 @@ def main():
         # Optical Point Spread Function (PSF) Deconvolution
         if args.deconvolve:
             repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            lca_deconv_bin = os.path.join(repo_root, "bin", "pie1800_lca_deconv")
             deconv_bin = os.path.join(repo_root, "bin", "pie1800_deconv")
-            if os.path.isfile(deconv_bin):
-                out_deconv_ppm = f"{out_base}_deconv.ppm"
-                out_deconv_png = f"{out_base}_deconv.png"
+            out_deconv_ppm = f"{out_base}_deconv.ppm"
+            out_deconv_png = f"{out_base}_deconv.png"
+
+            ppm_to_deconv = out_ppm
+            if args.aspect > 1 and img is not None:
+                ppm_to_deconv = f"{out_base}_scaled.ppm"
+                img.save(ppm_to_deconv)
+
+            if os.path.isfile(lca_deconv_bin):
+                print(f"\n[*] Step 5b: Applying Spatially-Varying LCA-Corrected Guided Deconvolution (iters={args.deconv_iters})...")
+                cmd = [lca_deconv_bin, ppm_to_deconv, out_deconv_ppm, "--iters", str(args.deconv_iters)]
+                ret = subprocess.run(cmd)
+            elif os.path.isfile(deconv_bin):
                 print(f"\n[*] Step 5b: Applying Richardson-Lucy Optical Deconvolution (sigma={args.deconv_sigma}, iters={args.deconv_iters})...")
-                # Deconvolve the aspect-scaled image if aspect > 1 or the base PPM
-                ppm_to_deconv = out_ppm
-                if args.aspect > 1 and img is not None:
-                    ppm_to_deconv = f"{out_base}_scaled.ppm"
-                    img.save(ppm_to_deconv)
                 ret = subprocess.run([deconv_bin, ppm_to_deconv, out_deconv_ppm, str(args.deconv_sigma), str(args.deconv_iters)])
-                if ret.returncode == 0:
-                    print(f"[+] Saved Deconvolved PPM: {out_deconv_ppm}")
-                    if HAS_PILLOW:
-                        try:
-                            dec_img = Image.open(out_deconv_ppm)
-                            dec_img.save(out_deconv_png)
-                            print(f"[+] Saved Deconvolved PNG: {out_deconv_png}")
-                        except Exception as e:
-                            print(f"[!] Warning converting deconvolved PPM to PNG: {e}")
             else:
-                print(f"[!] Notice: {deconv_bin} not found. Deconvolution skipped.")
+                ret = None
+                print(f"[!] Notice: Deconvolution binary not found. Deconvolution skipped.")
+
+            if ret and ret.returncode == 0:
+                print(f"[+] Saved Deconvolved PPM: {out_deconv_ppm}")
+                if HAS_PILLOW:
+                    try:
+                        dec_img = Image.open(out_deconv_ppm)
+                        dec_img.save(out_deconv_png)
+                        print(f"[+] Saved Deconvolved PNG: {out_deconv_png}")
+                    except Exception as e:
+                        print(f"[!] Warning converting deconvolved PPM to PNG: {e}")
 
         # Step 5c: Chroma-Only Grain-Preserving Denoising
         if args.chroma_denoise:

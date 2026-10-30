@@ -600,21 +600,29 @@ def main():
         # Optical deconvolution
         if args.deconvolve:
             repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            lca_deconv_bin = os.path.join(repo_root, "bin", "pie1800_lca_deconv")
             deconv_bin = os.path.join(repo_root, "bin", "pie1800_deconv")
-            if os.path.isfile(deconv_bin):
-                out_deconv_ppm = f"{out_base}_deconv.ppm"
-                out_deconv_png = f"{out_base}_deconv.png"
+            out_deconv_ppm = f"{out_base}_deconv.ppm"
+            out_deconv_png = f"{out_base}_deconv.png"
+            ppm_in = out_ppm
+            if args.aspect > 1 and img is not None:
+                ppm_in = f"{out_base}_scaled.ppm"
+                img.save(ppm_in)
+
+            if os.path.isfile(lca_deconv_bin):
+                print(f"\n[*] Applying Spatially-Varying LCA-Corrected Guided Deconvolution (iters={args.deconv_iters})...")
+                ret = subprocess.run([lca_deconv_bin, ppm_in, out_deconv_ppm, "--iters", str(args.deconv_iters)])
+            elif os.path.isfile(deconv_bin):
                 print(f"\n[*] Applying Richardson-Lucy Deconvolution (sigma={args.deconv_sigma}, iters={args.deconv_iters})...")
-                ppm_in = out_ppm
-                if args.aspect > 1 and img is not None:
-                    ppm_in = f"{out_base}_scaled.ppm"
-                    img.save(ppm_in)
                 ret = subprocess.run([deconv_bin, ppm_in, out_deconv_ppm, str(args.deconv_sigma), str(args.deconv_iters)])
-                if ret.returncode == 0:
-                    print(f"[+] Saved Deconvolved PPM: {out_deconv_ppm}")
-                    if HAS_PILLOW:
-                        Image.open(out_deconv_ppm).save(out_deconv_png)
-                        print(f"[+] Saved Deconvolved PNG: {out_deconv_png}")
+            else:
+                ret = None
+
+            if ret and ret.returncode == 0:
+                print(f"[+] Saved Deconvolved PPM: {out_deconv_ppm}")
+                if HAS_PILLOW:
+                    Image.open(out_deconv_ppm).save(out_deconv_png)
+                    print(f"[+] Saved Deconvolved PNG: {out_deconv_png}")
 
         # Raw binary
         out_bin = f"{out_base}_raw16.bin"
