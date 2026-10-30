@@ -48,6 +48,7 @@ typedef struct {
     uint8_t *converted_line;
     int line_bytes_remaining;
     int line_offset;
+    int line_repeat;
 } pie1800_session_t;
 
 static const SANE_String_Const s_scan_modes[] = {
@@ -151,7 +152,7 @@ SANE_Status sane_pie1800u_open(SANE_String_Const devicename, SANE_Handle *handle
 
     s->line_buf = (uint16_t *)malloc(PIE1800_LINE_BYTES);
     s->converted_line = (uint8_t *)malloc(PIE1800_LINE_PIXELS * 3);
-    s->offset_steps = 1380; // Calibrated film aperture offset (~19.5 mm)
+    s->offset_steps = 1250; // Calibrated film aperture offset (~17.6 mm)
 
     *handle = (SANE_Handle)s;
     return SANE_STATUS_GOOD;
@@ -221,7 +222,7 @@ SANE_Status sane_pie1800u_get_parameters(SANE_Handle handle, SANE_Parameters *pa
     params->format = SANE_FRAME_RGB;
     params->last_frame = SANE_TRUE;
     params->pixels_per_line = PIE1800_LINE_PIXELS;
-    params->lines = 875; // Verified physical frame length (875 steps from offset 1380 = 2255 max)
+    params->lines = 1900; // 950 motor steps * 2 (1800 DPI square pixel aspect ratio)
     params->depth = 8;
     params->bytes_per_line = PIE1800_LINE_PIXELS * 3;
 
@@ -242,9 +243,10 @@ SANE_Status sane_pie1800u_start(SANE_Handle handle) {
 
     s->scanning = true;
     s->current_line = 0;
-    s->total_lines = s->params.lines > 0 ? s->params.lines : 1800;
+    s->total_lines = s->params.lines > 0 ? s->params.lines : 1900;
     s->line_bytes_remaining = 0;
     s->line_offset = 0;
+    s->line_repeat = 0;
 
     return SANE_STATUS_GOOD;
 }
@@ -267,36 +269,43 @@ SANE_Status sane_pie1800u_read(SANE_Handle handle, SANE_Byte *data, SANE_Int max
                 break;
             }
 
-            int ret = pie1800_scan_line(s->hw, s->line_buf);
-            if (ret < 0) return SANE_STATUS_IO_ERROR;
+            if (s->line_repeat == 0) {
+                int ret = pie1800_scan_line(s->hw, s->line_buf);
+                if (ret < 0) return SANE_STATUS_IO_ERROR;
 
-            // Deplanarize 14-bit ADC samples (Planar R, G, B) to 8-bit Interleaved RGB
-            bool is_negative = (s->val[OPT_MODE] == 1);
-            for (int x = 0; x < PIE1800_LINE_PIXELS; x++) {
-                int r_s = s->line_buf[x] >> 2;
-                int g_s = s->line_buf[PIE1800_LINE_PIXELS + x] >> 2;
-                int b_s = s->line_buf[PIE1800_LINE_PIXELS * 2 + x] >> 2;
+                // Deplanarize 14-bit ADC samples (Planar R, G, B) to 8-bit Interleaved RGB
+                bool is_negative = (s->val[OPT_MODE] == 1);
+                for (int x = 0; x < PIE1800_LINE_PIXELS; x++) {
+                    int r_s = s->line_buf[x] >> 2;
+                    int g_s = s->line_buf[PIE1800_LINE_PIXELS + x] >> 2;
+                    int b_s = s->line_buf[PIE1800_LINE_PIXELS * 2 + x] >> 2;
 
-                int vr = (r_s * 255) / 4095;
-                int vg = (g_s * 255) / 4095;
-                int vb = (b_s * 255) / 4095;
+                    int vr = (r_s * 255) / 4095;
+                    int vg = (g_s * 255) / 4095;
+                    int vb = (b_s * 255) / 4095;
 
-                vr = (vr > 255) ? 255 : (vr < 0 ? 0 : vr);
-                vg = (vg > 255) ? 255 : (vg < 0 ? 0 : vg);
-                vb = (vb > 255) ? 255 : (vb < 0 ? 0 : vb);
+                    vr = (vr > 255) ? 255 : (vr < 0 ? 0 : vr);
+                    vg = (vg > 255) ? 255 : (vg < 0 ? 0 : vg);
+                    vb = (vb > 255) ? 255 : (vb < 0 ? 0 : vb);
 
-                if (is_negative) {
-                    vr = 255 - vr;
-                    vg = 255 - vg;
-                    vb = 255 - vb;
+                    if (is_negative) {
+                        vr = 255 - vr;
+                        vg = 255 - vg;
+                        vb = 255 - vb;
+                    }
+
+                    s->converted_line[x * 3 + 0] = (uint8_t)vr;
+                    s->converted_line[x * 3 + 1] = (uint8_t)vg;
+                    s->converted_line[x * 3 + 2] = (uint8_t)vb;
                 }
 
-                s->converted_line[x * 3 + 0] = (uint8_t)vr;
-                s->converted_line[x * 3 + 1] = (uint8_t)vg;
-                s->converted_line[x * 3 + 2] = (uint8_t)vb;
+                // Advance stepper 1 microstep (~900 DPI pitch)
+                pie1800_move(s->hw, PIE1800_DIR_FORWARD, 1);
+                s->line_repeat = 1; // Deliver second line of pair for 1800 DPI square aspect
+            } else {
+                s->line_repeat = 0;
             }
 
-            pie1800_move(s->hw, PIE1800_DIR_FORWARD, 1);
             s->current_line++;
             s->line_bytes_remaining = PIE1800_LINE_PIXELS * 3;
             s->line_offset = 0;

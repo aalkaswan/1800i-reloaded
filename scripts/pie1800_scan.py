@@ -159,10 +159,12 @@ def save_ppm(filename, width, height, rgb_bytes):
 
 def main():
     parser = argparse.ArgumentParser(description="PrimeFilm 1800u / 1800i Native Image Scanner")
-    parser.add_argument("--offset", type=int, default=1380,
-                        help="Initial steps to advance carriage to film aperture (verified default: 1380)")
-    parser.add_argument("--lines", type=int, default=875,
-                        help="Number of lines to scan (verified physical rail limit: 875 lines)")
+    parser.add_argument("--offset", type=int, default=1250,
+                        help="Initial steps to advance carriage to film aperture (default: 1250)")
+    parser.add_argument("--lines", type=int, default=980,
+                        help="Number of motor lines to scan (default: 980 lines = 2230 max steps)")
+    parser.add_argument("--aspect", type=int, default=2,
+                        help="Vertical aspect ratio scaling multiplier (default: 2 for 900 DPI motor pitch)")
     parser.add_argument("--step", type=int, default=1,
                         help="Microsteps per line (default: 1)")
     parser.add_argument("--exposure", type=int, default=2900,
@@ -374,6 +376,10 @@ def main():
         if HAS_PILLOW:
             out_png = f"{out_base}.png"
             img = Image.frombytes("RGB", (PIXELS_PER_LINE, valid_lines), bytes(rgb_8bit))
+            if args.aspect > 1:
+                target_height = valid_lines * args.aspect
+                img = img.resize((PIXELS_PER_LINE, target_height), Image.Resampling.BILINEAR)
+                print(f"[*] Applied {args.aspect}x optical aspect correction -> {PIXELS_PER_LINE}x{target_height}")
             img.save(out_png)
             print(f"[+] Saved Reconstructed RGB PNG: {out_png}")
 
