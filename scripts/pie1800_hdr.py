@@ -61,8 +61,9 @@ WORDS_PER_LINE = 8100
 MAX_RAIL_STEPS = 2260
 
 # Nominal exposure clock presets (at ~460 kHz CCD timing)
-DEFAULT_BRACKETS = [1450, 2900, 5800]  # -1.0 EV, 0.0 EV (nominal), +1.0 EV
-EXTENDED_BRACKETS = [1000, 2900, 5800, 11600]  # -1.5 EV to +2.0 EV (3.54 EV expansion)
+# Hardware sampling gate (0x98..0x9b) supports clean linear integration across 2800..3800 clocks
+DEFAULT_BRACKETS = [2800, 3100, 3500]  # Safe linear range with zero zeros / sampling cutoff
+EXTENDED_BRACKETS = [2800, 3100, 3400, 3800]  # Extended dynamic range
 
 # DMA descriptor for 16,200 bytes Bulk IN transfer
 _DMA_DESC = struct.pack("<BBBB I", 0x00, 0x00, 0x00, 0x00, FULL_LINE_BYTES)
@@ -291,28 +292,76 @@ def connect_scanner():
 
 
 # ==============================================================================
-# Per-Bracket DSNU Dark Calibration
+# Optical Black & Smooth Dark Reference Calibration
 # ==============================================================================
+
+def extract_optical_black(raw_words: List[int]) -> Tuple[float, float, float]:
+    """
+    Extract physical optical black reference level from shielded dummy sensels (cols 10..40).
+    Under the sensor's physical opaque aluminum mask, these sensels establish the true
+    active dark reference floor for each scan line without sensel-to-sensel clamping steps.
+    """
+    r_sensels = raw_words[10:40]
+    g_sensels = raw_words[PIXELS_PER_LINE + 10 : PIXELS_PER_LINE + 40]
+    b_sensels = raw_words[PIXELS_PER_LINE * 2 + 10 : PIXELS_PER_LINE * 2 + 40]
+
+    ob_r = sum(sorted(r_sensels)[5:25]) / 20.0
+    ob_g = sum(sorted(g_sensels)[5:25]) / 20.0
+    ob_b = sum(sorted(b_sensels)[5:25]) / 20.0
+    return ob_r, ob_g, ob_b
+
+def lowpass_smooth_1d(signal: List[float], radius: int = 15) -> List[float]:
+    """Fast 1D boxcar smoothing using prefix sums in O(N)."""
+    n = len(signal)
+    if n == 0 or radius <= 0:
+        return list(signal)
+    prefix = [0.0] * (n + 1)
+    for i in range(n):
+        prefix[i + 1] = prefix[i] + signal[i]
+    out = [0.0] * n
+    for i in range(n):
+        left = max(0, i - radius)
+        right = min(n - 1, i + radius)
+        out[i] = (prefix[right + 1] - prefix[left]) / (right - left + 1)
+    return out
 
 class BracketDarkCalibration:
     """
-    Stores matching dark-current DSNU (Dark Signal Non-Uniformity) profiles
-    calibrated at each bracket exposure time.
+    Stores smooth dark-current DSNU profiles and Optical Black references.
+    Eliminates sensel clamping step artifacts (>4000 counts) that inject vertical color streaks.
     """
     def __init__(self):
         # Maps exposure_clocks -> dict of channel -> list of float [2700]
         self.profiles: Dict[int, Dict[str, List[float]]] = {}
         self.stats: Dict[int, Dict[str, Any]] = {}
 
-    def add_bracket(self, exp_clocks: int, dark_r: List[float], dark_g: List[float], dark_b: List[float]):
+    def add_bracket(self, exp_clocks: int, dark_r: List[float], dark_g: List[float], dark_b: List[float], smooth_clamped: bool = False):
+        n = len(dark_r)
+        clean_r = list(dark_r)
+        clean_g = list(dark_g)
+        clean_b = list(dark_b)
+
+        if smooth_clamped:
+            # On physical hardware, measuring dark frames with lamp OFF causes sensels to float/saturate
+            # at the 4095 ADC ceiling or deviate widely from optical black.
+            # Reject clamp artifacts by bounding sensel variation relative to optical black dummy sensels.
+            for ch_arr in [clean_r, clean_g, clean_b]:
+                ob = sum(ch_arr[10:40]) / 30.0
+                for i in range(n):
+                    if ch_arr[i] >= 4090.0 or abs(ch_arr[i] - ob) > 35.0:
+                        ch_arr[i] = ob
+                smoothed = lowpass_smooth_1d(ch_arr, radius=15)
+                ch_arr[:] = smoothed
+
         self.profiles[exp_clocks] = {
-            "r": list(dark_r),
-            "g": list(dark_g),
-            "b": list(dark_b),
+            "r": clean_r,
+            "g": clean_g,
+            "b": clean_b,
         }
+
         # Compute DSNU statistics
         stats_ch = {}
-        for ch, arr in [("r", dark_r), ("g", dark_g), ("b", dark_b)]:
+        for ch, arr in [("r", clean_r), ("g", clean_g), ("b", clean_b)]:
             mean_v = sum(arr) / len(arr)
             var_v = sum((x - mean_v) ** 2 for x in arr) / len(arr)
             stats_ch[ch] = {
@@ -324,25 +373,49 @@ class BracketDarkCalibration:
             }
         self.stats[exp_clocks] = stats_ch
 
-    def subtract_dark(self, exp_clocks: int, raw_words: List[int]) -> Tuple[List[float], List[float], List[float]]:
+    def subtract_dark(
+        self,
+        exp_clocks: int,
+        raw_words: List[int],
+        use_live_ob: bool = False
+    ) -> Tuple[List[float], List[float], List[float]]:
         """
         Subtract matching DSNU dark frame from raw inverted CCD words:
-            Signal(x) = max(0.0, Dark(x) - Raw(x))
-        Returns:
-            (sig_r, sig_g, sig_b) in photon-induced transmission counts.
+            Signal(x) = max(0.0, Dark_eff(x) - Raw(x))
+        Eliminates sensel clamp step artifacts and preserves linear radiance fidelity.
         """
-        prof = self.profiles[exp_clocks]
-        dr = prof["r"]
-        dg = prof["g"]
-        db = prof["b"]
-
         raw_r = raw_words[0:PIXELS_PER_LINE]
         raw_g = raw_words[PIXELS_PER_LINE:PIXELS_PER_LINE * 2]
         raw_b = raw_words[PIXELS_PER_LINE * 2:PIXELS_PER_LINE * 3]
 
-        sig_r = [max(0.0, dr[x] - float(raw_r[x])) for x in range(PIXELS_PER_LINE)]
-        sig_g = [max(0.0, dg[x] - float(raw_g[x])) for x in range(PIXELS_PER_LINE)]
-        sig_b = [max(0.0, db[x] - float(raw_b[x])) for x in range(PIXELS_PER_LINE)]
+        if exp_clocks in self.profiles:
+            prof = self.profiles[exp_clocks]
+            dr = prof["r"]
+            dg = prof["g"]
+            db = prof["b"]
+            if use_live_ob:
+                ob_r, ob_g, ob_b = extract_optical_black(raw_words)
+                dr_ob = sum(dr[10:40]) / 30.0
+                dg_ob = sum(dg[10:40]) / 30.0
+                db_ob = sum(db[10:40]) / 30.0
+                # Sensel delta relative to optical black is bounded strictly to +/- 20 counts
+                base_r = [ob_r + max(-20.0, min(20.0, dr[x] - dr_ob)) for x in range(PIXELS_PER_LINE)]
+                base_g = [ob_g + max(-20.0, min(20.0, dg[x] - dg_ob)) for x in range(PIXELS_PER_LINE)]
+                base_b = [ob_b + max(-20.0, min(20.0, db[x] - db_ob)) for x in range(PIXELS_PER_LINE)]
+                sig_r = [max(0.0, base_r[x] - float(raw_r[x])) for x in range(PIXELS_PER_LINE)]
+                sig_g = [max(0.0, base_g[x] - float(raw_g[x])) for x in range(PIXELS_PER_LINE)]
+                sig_b = [max(0.0, base_b[x] - float(raw_b[x])) for x in range(PIXELS_PER_LINE)]
+            else:
+                sig_r = [max(0.0, dr[x] - float(raw_r[x])) for x in range(PIXELS_PER_LINE)]
+                sig_g = [max(0.0, dg[x] - float(raw_g[x])) for x in range(PIXELS_PER_LINE)]
+                sig_b = [max(0.0, db[x] - float(raw_b[x])) for x in range(PIXELS_PER_LINE)]
+        else:
+            # Fallback directly to instantaneous optical black level
+            ob_r, ob_g, ob_b = extract_optical_black(raw_words)
+            sig_r = [max(0.0, ob_r - float(raw_r[x])) for x in range(PIXELS_PER_LINE)]
+            sig_g = [max(0.0, ob_g - float(raw_g[x])) for x in range(PIXELS_PER_LINE)]
+            sig_b = [max(0.0, ob_b - float(raw_b[x])) for x in range(PIXELS_PER_LINE)]
+
         return sig_r, sig_g, sig_b
 
 def calibrate_dark_brackets(
@@ -355,12 +428,14 @@ def calibrate_dark_brackets(
 ) -> BracketDarkCalibration:
     """
     Calibrate matching DSNU dark frames with lamp OFF at each bracket integration time.
+    Uses inter-bracket purge readouts and smooth profile filtering.
     """
     calib = BracketDarkCalibration()
     set_lamp(dev, False)
     time.sleep(0.5)
     set_gain_and_offset(dev, gain, offset)
 
+    last_exp = None
     for exp in brackets:
         if analog_balance:
             exp_r = exp
@@ -369,7 +444,10 @@ def calibrate_dark_brackets(
         else:
             exp_r = exp_g = exp_b = exp
 
-        set_exposure(dev, exp_r, exp_g, exp_b)
+        if exp != last_exp:
+            set_exposure(dev, exp_r, exp_g, exp_b)
+            _ = capture_raw_line(dev)  # Purge residual shift register charge
+            last_exp = exp
 
         acc_r = [0.0] * PIXELS_PER_LINE
         acc_g = [0.0] * PIXELS_PER_LINE
@@ -387,7 +465,7 @@ def calibrate_dark_brackets(
         dark_r = [x * inv_n for x in acc_r]
         dark_g = [x * inv_n for x in acc_g]
         dark_b = [x * inv_n for x in acc_b]
-        calib.add_bracket(exp, dark_r, dark_g, dark_b)
+        calib.add_bracket(exp, dark_r, dark_g, dark_b, smooth_clamped=True)
 
     return calib
 
@@ -810,8 +888,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="PrimeFilm 1800u / 1800i Multi-Exposure Analog Bracketed HDR & Film Dmax Extender"
     )
-    parser.add_argument("--brackets", type=str, default="1450,2900,5800",
-                        help="Comma-separated exposure clocks (default: '1450,2900,5800')")
+    parser.add_argument("--brackets", type=str, default="2800,3100,3500",
+                        help="Comma-separated exposure clocks (default: '2800,3100,3500' for clean streak-free linear response)")
     parser.add_argument("--fusion", choices=["linear", "mertens", "both"], default="both",
                         help="HDR Fusion algorithm: 'linear' (Debevec radiance map), 'mertens' (exposure fusion), or 'both' (default: both)")
     parser.add_argument("--tonemap", choices=["filmic", "reinhard", "gamma"], default="filmic",
@@ -857,7 +935,7 @@ def main():
         brackets = [int(x.strip()) for x in args.brackets.split(",")]
         brackets = sorted(list(set(brackets)))
     except Exception:
-        print(f"[!] Invalid bracket list: {args.brackets}. Using defaults: 1450,2900,5800")
+        print(f"[!] Invalid bracket list: {args.brackets}. Using defaults: 2800,3100,3500")
         brackets = DEFAULT_BRACKETS
 
     # Print engineering summary banner
@@ -946,6 +1024,7 @@ def main():
             print(f"\n[*] Phase 4: Acquiring {args.lines} lines across {len(brackets)} brackets...")
             t_start = time.time()
 
+            last_exp = None
             for line_idx in range(args.lines):
                 # At the current carriage position, capture all exposure brackets
                 for exp in brackets:
@@ -956,12 +1035,17 @@ def main():
                     else:
                         exp_r = exp_g = exp_b = exp
 
-                    set_exposure(dev, exp_r, exp_g, exp_b)
+                    if exp != last_exp:
+                        set_exposure(dev, exp_r, exp_g, exp_b)
+                        # Purge transitional line charge from previous exposure time
+                        _ = capture_raw_line(dev)
+                        last_exp = exp
+
                     raw_data = capture_raw_line(dev)
                     words = struct.unpack(f"<{len(raw_data)//2}H", raw_data)
 
-                    # Subtract matching DSNU profile
-                    sig_r, sig_g, sig_b = calib.subtract_dark(exp, words)
+                    # Subtract matching DSNU profile with optical black anchor
+                    sig_r, sig_g, sig_b = calib.subtract_dark(exp, words, use_live_ob=True)
                     bracket_lines[exp][0].append(sig_r)
                     bracket_lines[exp][1].append(sig_g)
                     bracket_lines[exp][2].append(sig_b)
@@ -1035,19 +1119,45 @@ def main():
             tm_g = tonemap_reinhard(rad_g)
             tm_b = tonemap_reinhard(rad_b)
 
+        # Helper: sample 1st and 99th percentiles per channel to neutralize orange film base mask
+        def get_channel_bounds_2d(lines_2d, p_low: float = 1.0, p_high: float = 99.0):
+            sample = []
+            stride = max(1, h // 50)
+            for y in range(0, h, stride):
+                sample.extend(lines_2d[y][::8])
+            sample.sort()
+            idx_low = int(len(sample) * p_low / 100.0)
+            idx_high = int(len(sample) * p_high / 100.0)
+            return sample[idx_low], max(sample[idx_high], sample[idx_low] + 1e-4)
+
         # Render 8-bit RGB bytearray
         rgb_bytes = bytearray()
-        for y in range(h):
-            for x in range(w):
-                vr = int(tm_r[y][x] * 255.0)
-                vg = int(tm_g[y][x] * 255.0)
-                vb = int(tm_b[y][x] * 255.0)
-                vr = max(0, min(255, vr))
-                vg = max(0, min(255, vg))
-                vb = max(0, min(255, vb))
-                if args.negative:
-                    vr, vg, vb = 255 - vr, 255 - vg, 255 - vb
-                rgb_bytes.extend([vr, vg, vb])
+        if args.negative:
+            r_min, r_max = get_channel_bounds_2d(tm_r, 1.0, 99.0)
+            g_min, g_max = get_channel_bounds_2d(tm_g, 1.0, 99.0)
+            b_min, b_max = get_channel_bounds_2d(tm_b, 1.0, 99.0)
+            r_range = max(r_max - r_min, 1e-4)
+            g_range = max(g_max - g_min, 1e-4)
+            b_range = max(b_max - b_min, 1e-4)
+            for y in range(h):
+                for x in range(w):
+                    vr = 255 - int((tm_r[y][x] - r_min) / r_range * 255.0)
+                    vg = 255 - int((tm_g[y][x] - g_min) / g_range * 255.0)
+                    vb = 255 - int((tm_b[y][x] - b_min) / b_range * 255.0)
+                    vr = max(0, min(255, vr))
+                    vg = max(0, min(255, vg))
+                    vb = max(0, min(255, vb))
+                    rgb_bytes.extend([vr, vg, vb])
+        else:
+            for y in range(h):
+                for x in range(w):
+                    vr = int(tm_r[y][x] * 255.0)
+                    vg = int(tm_g[y][x] * 255.0)
+                    vb = int(tm_b[y][x] * 255.0)
+                    vr = max(0, min(255, vr))
+                    vg = max(0, min(255, vg))
+                    vb = max(0, min(255, vb))
+                    rgb_bytes.extend([vr, vg, vb])
 
         out_linear_ppm = f"{out_base}_linear_tonemapped.ppm"
         save_ppm(out_linear_ppm, w, h, bytes(rgb_bytes))
@@ -1069,31 +1179,45 @@ def main():
 
         h = len(mf_r)
         w = len(mf_r[0])
-        # Find 1st and 99th percentiles for contrast stretching
-        def get_bounds(lines):
-            sample = [lines[y][x] for y in range(0, h, max(1, h // 50)) for x in range(0, w, 20)]
-            sample.sort()
-            return sample[int(len(sample) * 0.01)], sample[int(len(sample) * 0.99)]
-
-        min_r, max_r = get_bounds(mf_r)
-        min_g, max_g = get_bounds(mf_g)
-        min_b, max_b = get_bounds(mf_b)
-        range_r = max(max_r - min_r, 1e-4)
-        range_g = max(max_g - min_g, 1e-4)
-        range_b = max(max_b - min_b, 1e-4)
-
         rgb_mertens = bytearray()
-        for y in range(h):
-            for x in range(w):
-                vr = int((mf_r[y][x] - min_r) / range_r * 255.0)
-                vg = int((mf_g[y][x] - min_g) / range_g * 255.0)
-                vb = int((mf_b[y][x] - min_b) / range_b * 255.0)
-                vr = max(0, min(255, vr))
-                vg = max(0, min(255, vg))
-                vb = max(0, min(255, vb))
-                if args.negative:
-                    vr, vg, vb = 255 - vr, 255 - vg, 255 - vb
-                rgb_mertens.extend([vr, vg, vb])
+        if args.negative:
+            r_min, r_max = get_channel_bounds_2d(mf_r, 1.0, 99.0)
+            g_min, g_max = get_channel_bounds_2d(mf_g, 1.0, 99.0)
+            b_min, b_max = get_channel_bounds_2d(mf_b, 1.0, 99.0)
+            r_range = max(r_max - r_min, 1e-4)
+            g_range = max(g_max - g_min, 1e-4)
+            b_range = max(b_max - b_min, 1e-4)
+            for y in range(h):
+                for x in range(w):
+                    vr = 255 - int((mf_r[y][x] - r_min) / r_range * 255.0)
+                    vg = 255 - int((mf_g[y][x] - g_min) / g_range * 255.0)
+                    vb = 255 - int((mf_b[y][x] - b_min) / b_range * 255.0)
+                    vr = max(0, min(255, vr))
+                    vg = max(0, min(255, vg))
+                    vb = max(0, min(255, vb))
+                    rgb_mertens.extend([vr, vg, vb])
+        else:
+            # Find joint 1st and 99th percentiles across luminance to maintain neutral color balance
+            def get_joint_bounds(r_lines, g_lines, b_lines):
+                sample = []
+                stride = max(1, h // 50)
+                for y in range(0, h, stride):
+                    for x in range(0, w, 20):
+                        sample.append(0.2126 * r_lines[y][x] + 0.7152 * g_lines[y][x] + 0.0722 * b_lines[y][x])
+                sample.sort()
+                return sample[int(len(sample) * 0.01)], sample[int(len(sample) * 0.99)]
+
+            min_val, max_val = get_joint_bounds(mf_r, mf_g, mf_b)
+            range_val = max(max_val - min_val, 1e-4)
+            for y in range(h):
+                for x in range(w):
+                    vr = int((mf_r[y][x] - min_val) / range_val * 255.0)
+                    vg = int((mf_g[y][x] - min_val) / range_val * 255.0)
+                    vb = int((mf_b[y][x] - min_val) / range_val * 255.0)
+                    vr = max(0, min(255, vr))
+                    vg = max(0, min(255, vg))
+                    vb = max(0, min(255, vb))
+                    rgb_mertens.extend([vr, vg, vb])
 
         out_mertens_ppm = f"{out_base}_mertens.ppm"
         save_ppm(out_mertens_ppm, w, h, bytes(rgb_mertens))

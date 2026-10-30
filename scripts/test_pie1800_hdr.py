@@ -221,6 +221,36 @@ class TestHDRBracketedFusion(unittest.TestCase):
         self.assertAlmostEqual(m4["dynamic_range_gain_db"], 21.29, delta=0.05)
         self.assertAlmostEqual(m4["delta_dmax"], 1.064, delta=0.005)
 
+    def test_clamped_dark_frame_does_not_inject_color_streaks(self):
+        """
+        Regression Test: Hardware ADC clamping at ceiling (4095) in dark frames must be
+        repaired/smoothed so it does not inject 800+ count step discontinuities (vertical streaks).
+        """
+        n = self.n
+        calib = BracketDarkCalibration()
+
+        # Simulate hardware ADC clamping at 4095 on Green sensels 1599..2000
+        # Sensels 0..1598 sit at 3200; sensels 1599..2000 are clamped hard at 4095
+        dark_clamped_g = [3200.0] * n
+        for x in range(1599, 2000):
+            dark_clamped_g[x] = 4095.0
+
+        dark_r = [3600.0] * n
+        dark_b = [3700.0] * n
+
+        # Add bracket with smooth_clamped=True (live hardware mode)
+        calib.add_bracket(2000, dark_r, dark_clamped_g, dark_b, smooth_clamped=True)
+
+        # Smooth optical transmission line from film
+        film_raw_g = [1100] * n
+        raw_words = [1100] * (n * 3)
+
+        sig_r, sig_g, sig_b = calib.subtract_dark(2000, raw_words)
+
+        # Check adjacent difference across the clamp boundary at 1598 -> 1599
+        clamp_step = abs(sig_g[1599] - sig_g[1598])
+        self.assertLess(clamp_step, 20.0, f"Expected smooth clamp transition < 20 counts, got {clamp_step:.1f}")
+
     def test_tiff_16bit_master_export(self):
         """Verify that 16-bit uncompressed linear TIFF files are valid and contain 16-bit tags."""
         w, h = 50, 10
