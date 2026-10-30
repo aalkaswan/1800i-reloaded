@@ -810,11 +810,12 @@ int main(int argc, char **argv) {
 
     char magic[3];
     int w, h, max_val;
-    if (fscanf(fin, "%2s\n%d %d\n%d\n", magic, &w, &h, &max_val) != 4 || strcmp(magic, "P6") != 0) {
+    if (fscanf(fin, "%2s %d %d %d", magic, &w, &h, &max_val) != 4 || strcmp(magic, "P6") != 0) {
         fprintf(stderr, "Error: only binary PPM (P6) supported.\n");
         fclose(fin);
         return 1;
     }
+    fgetc(fin); // Consume single delimiter byte after max_val
 
     int total_pixels = w * h;
     uint8_t *rgb_in = (uint8_t*)malloc(total_pixels * 3);
