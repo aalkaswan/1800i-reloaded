@@ -4,6 +4,10 @@ Complete open-source native Linux driver, SANE backend, and computational optica
 
 Includes full reverse-engineering documentation, decompiled Windows driver protocols, high-speed pipelined DMA acquisition, spatially-varying rod-lens deconvolution, sub-pixel super-resolution (up to 3600 DPI equivalent), CIE-LAB chroma grain-preserving denoising, and multi-exposure bracketed analog HDR.
 
+This project was done with heavy AI assitance and probably wouldn't have been possible or feasible without. The goal was to turn a 20 year old 1880i scanner (bought for 10 Euros, looked brand new), which was essentially e-waste, into something usable. The scanner only worked on Windows, either with vuescan or the drivers from PrimeFilm, driver support on Linux was non-existent. The scanner now works on Linux, is much quicker and the quality of the scans seem to be much better.
+
+One problem that I ran into quite early is that, even though the scanner is clearly labeled as an 1800i, its actually an 1800u under the hood. The 1800 series was sold and relabled as many different scanners, with different hardware under the hood, so check the USB PID before attempting anything.
+ 
 ---
 
 ## 1. Important Disclaimers & Hardware Safety Notice
@@ -24,8 +28,9 @@ Includes full reverse-engineering documentation, decompiled Windows driver proto
 
 > [!NOTE]
 > **THIRD-PARTY REVERSE-ENGINEERED DRIVER & TRADEMARK DISCLAIMER**
-> This project is an independent, clean-room reverse-engineered open-source initiative. It is **not** manufactured, authorized, sponsored, endorsed, or affiliated with **Pacific Image Electronics Co., Ltd. (PIE)**, **Reflecta GmbH** (iScan 1800), or **Hamrick Software** (VueScan).
+> This project is an independent, reverse-engineered open-source initiative. It is **not** manufactured, authorized, sponsored, endorsed, or affiliated with **Pacific Image Electronics Co., Ltd. (PIE)**, **Reflecta GmbH** (iScan 1800), or **Hamrick Software** (VueScan).
 > All product names, logos, and brands (e.g. *PrimeFilm*, *CyberView*, *VueScan*, *Reflecta*, *Genesys Logic*) are property of their respective owners and are used here solely for hardware identification, protocol interoperability, and documentation purposes.
+> This project is meant to create compatibility where there previously was none, the reverse engineering activities are therefore lawful under Art. 45n of the Dutch Copyright Act (Auteurswet). Check your local laws and regulations. 
 
 > [!NOTE]
 > **WARRANTY DISCLAIMER**
