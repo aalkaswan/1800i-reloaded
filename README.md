@@ -4,7 +4,7 @@ Complete open-source native Linux driver, SANE backend, and computational optica
 
 Includes full reverse-engineering documentation, decompiled Windows driver protocols, high-speed pipelined DMA acquisition, spatially-varying rod-lens deconvolution, sub-pixel super-resolution (up to 3600 DPI equivalent), CIE-LAB chroma grain-preserving denoising, and multi-exposure bracketed analog HDR.
 
-This project was done with heavy AI assitance and probably wouldn't have been possible or feasible without. The goal was to turn a 20 year old 1880i scanner (bought for 10 Euros, looked brand new), which was essentially e-waste, into something usable. The scanner only worked on Windows, either with vuescan or the drivers from PrimeFilm, driver support on Linux was non-existent. The scanner now works on Linux, is much quicker and the quality of the scans seem to be much better.
+This project was done with heavy AI assistance and probably wouldn't have been possible or feasible without. The goal was to turn a 20 year old 1880i scanner (bought for 10 Euros), which was essentially e-waste, into something usable. The scanner only worked on Windows, either with vuescan or the drivers from PrimeFilm, driver support on Linux was non-existent. The scanner now works on Linux, the scanning speed was improved  and the quality of the scans is higher. All the documentation, decompiled drivers and scripts are freely available.
 
 One problem that I ran into quite early is that, even though the scanner is clearly labeled as an 1800i, its actually an 1800u under the hood. The 1800 series was sold and relabled as many different scanners, with different hardware under the hood, so check the USB PID before attempting anything.
  
@@ -154,7 +154,7 @@ scanimage -d pie1800u --format=png --output sane_scan.png
 
 ## 3. How This Project Was Developed
 
-This project was built from scratch through pair programming using **Google Antigravity** (an advanced agentic AI coding assistant) and **REA (Reverse Engineer Anything)** (a local-only reverse-engineering analysis framework), powered by state-of-the-art **Gemini large language models (Gemini 1.5 Pro / Flash)**.
+This project was built from scratch through pair programming using **Google Antigravity (Gemini 1.5 Pro / Flash)*** and **REA (Reverse Engineer Anything)** (a local-only reverse-engineering analysis framework).
 
 ### Reverse-Engineering & AI Methodology
 1. **Binary Decompilation & Static Analysis**:
