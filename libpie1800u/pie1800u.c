@@ -2,8 +2,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <errno.h>
+
+#if defined(_WIN32) || defined(__CYGWIN__)
+#include <windows.h>
+static inline void pie1800_sleep_us(unsigned int us) {
+    if (us >= 1000) {
+        Sleep(us / 1000);
+    } else {
+        LARGE_INTEGER freq, start, cur;
+        QueryPerformanceFrequency(&freq);
+        QueryPerformanceCounter(&start);
+        double ticks_to_wait = (double)us * (freq.QuadPart / 1000000.0);
+        do {
+            QueryPerformanceCounter(&cur);
+        } while ((cur.QuadPart - start.QuadPart) < ticks_to_wait);
+    }
+}
+#define usleep(x) pie1800_sleep_us(x)
+#else
+#include <unistd.h>
+#endif
 
 #define USB_TIMEOUT_MS 2000
 

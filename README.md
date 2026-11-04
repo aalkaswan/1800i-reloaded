@@ -121,7 +121,52 @@ python3 scripts/pie1800_superres.py --scan 4 --lines 950 --method ibp --scale 2 
 python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-balance --linear16 --out scan_raw_master
 ```
 
-### E. CLI Reference Table
+### E. Desktop Studio UI Application (Linux & Windows 10/11)
+
+The repository provides a modern, interactive **PrimeFilm Studio UI** featuring:
+- **Real-Time Scanline Streaming**: 11.7 lines/s live display with an active optical sweep line.
+- **Interactive 8-Handle Crop Box**: Live rule-of-thirds composition overlay and drag handles.
+- **60 FPS Hardware Inversion**: 1D LUT negative inversion, orange mask eyedropper neutralization, and contrast/gamma curves.
+- **Dynamic 256-Bin RGB Histograms**: Real-time channel exposure distribution monitoring.
+- **Interactive Carriage Jog Rail**: Direct positioning from home dock (0) to maximum safe limit (2,260 microsteps).
+- **Dual-Engine Architecture**: Automatically boots a native **Qt (PySide6)** desktop window when available, or immediately launches the zero-dependency in-box **Desktop Web Studio** on `http://127.0.0.1:8080` in Chrome/Edge/Firefox!
+
+#### Launching on Linux:
+```fish
+# Launch Studio UI (runs native Qt if PySide6 is installed, or auto-boots Web Studio)
+./run_studio.sh
+
+# Or force the zero-dependency Web Studio interface on port 8080
+python3 scripts/primefilm_studio_app.py --web
+
+# Test offline in simulation mode without hardware connected
+python3 scripts/primefilm_studio_app.py --mock
+```
+
+#### Launching on Windows 10 / 11:
+1. Double-click `run_studio.bat` (or run `python scripts\primefilm_studio_app.py`).
+2. If PySide6 is not installed, it automatically launches the zero-dependency Web Studio in your browser without requiring extra packages.
+3. For the native Qt standalone window:
+   ```cmd
+   pip install PySide6 pyusb libusb-package pillow
+   run_studio.bat
+   ```
+
+---
+
+### F. Windows 10 & 11 Native Setup
+
+The PrimeFilm 1800u / 1800i works natively on 64-bit Windows 10 and 11 using Microsoft's in-box **WinUSB** driver architecture:
+
+1. **Install WinUSB Driver**:
+   - **Method A (Zadig - Recommended)**: Open [Zadig](https://zadig.akeo.ie/), select *PrimeFilm 1800u* (`05e3:0120`), select **WinUSB**, and click *Install Driver*.
+   - **Method B (Native INF)**: Run `pnputil /add-driver windows_driver\pie1800u_winusb.inf /install` in an elevated terminal.
+2. **C Library Portability**: `libpie1800u` includes `PIE1800_API` DLL exports and high-resolution `QueryPerformanceCounter` timing, ready to build with MSVC (`cl.exe`) or MinGW (`gcc`).
+3. See [windows_driver/README_WINDOWS.md](windows_driver/README_WINDOWS.md) for full Windows driver and hardware setup details.
+
+---
+
+### G. CLI Reference Table
 
 | Flag | Default | Description |
 | :--- | :--- | :--- |
@@ -138,7 +183,7 @@ python3 scripts/pie1800_scan.py --offset 1250 --lines 950 --samples 4 --analog-b
 | `--gain` | `31` | Analog Front End (AFE) PGA amplifier gain (`0x1f`). |
 | `--out` | `scan_output`| Output filename prefix for generated images and metadata. |
 
-### F. SANE Backend Installation (`libsane-pie1800u`)
+### H. SANE Backend Installation (`libsane-pie1800u`)
 
 To use the PrimeFilm 1800u with standard Linux scanning GUI software (XSane, Simple Scan, Document Scanner, `scanimage`):
 

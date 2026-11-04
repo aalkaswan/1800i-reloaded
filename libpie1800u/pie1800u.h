@@ -10,6 +10,16 @@
 extern "C" {
 #endif
 
+#if defined(_WIN32) || defined(__CYGWIN__)
+  #ifdef PIE1800U_EXPORTS
+    #define PIE1800_API __declspec(dllexport)
+  #else
+    #define PIE1800_API __declspec(dllimport)
+  #endif
+#else
+  #define PIE1800_API __attribute__((visibility("default")))
+#endif
+
 #define PIE1800_VID              0x05e3
 #define PIE1800_PID              0x0120
 #define PIE1800_EP_IN            0x81
