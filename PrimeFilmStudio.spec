@@ -29,6 +29,14 @@ try:
 except ImportError:
     pass
 
+# Collect libusb_package if available
+try:
+    import libusb_package
+    hidden_imports += collect_submodules('libusb_package')
+    datas += collect_data_files('libusb_package')
+except ImportError:
+    pass
+
 datas = []
 
 a = Analysis(

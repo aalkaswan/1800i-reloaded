@@ -123,22 +123,39 @@ DMA_PACKET_DESC = struct.pack("<BBBB I", 0x00, 0x00, 0x00, 0x00, FULL_LINE_BYTES
 def get_libusb_backend():
     """
     Locates libusb-1.0 on Linux and Windows.
-    On Windows, searches local directories, bin/, and system path to ensure PyUSB finds the DLL.
+    On Windows, searches PyInstaller bundle dir, libusb-package, local directories, bin/, and system path.
     """
     if not HAS_PYUSB:
         return None
+
+    # First check if libusb_package is installed (packaged with PyInstaller)
+    try:
+        import libusb_package
+        backend = libusb_package.get_libusb1_backend()
+        if backend:
+            return backend
+    except Exception:
+        pass
 
     if sys.platform == "win32":
         # Potential locations for libusb-1.0.dll on Windows
         base_dir = os.path.dirname(os.path.abspath(__file__))
         repo_dir = os.path.dirname(base_dir)
-        candidates = [
+        candidates = []
+
+        # PyInstaller temp unpack directory
+        if hasattr(sys, "_MEIPASS"):
+            candidates.append(os.path.join(sys._MEIPASS, "libusb-1.0.dll"))
+            candidates.append(os.path.join(sys._MEIPASS, "libusb_package", "libusb-1.0.dll"))
+
+        candidates.extend([
             os.path.join(base_dir, "libusb-1.0.dll"),
             os.path.join(repo_dir, "bin", "libusb-1.0.dll"),
             os.path.join(base_dir, "bin", "libusb-1.0.dll"),
             r"C:\Windows\System32\libusb-1.0.dll",
             r"C:\Program Files\PrimeFilm 1800 Reloaded\libusb-1.0.dll"
-        ]
+        ])
+
         for dll_path in candidates:
             if os.path.isfile(dll_path):
                 try:
