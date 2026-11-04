@@ -291,8 +291,8 @@ def main():
                         help="Output file prefix (default: scan_output)")
     args = parser.parse_args()
 
-    # Hardware rail protection: ensure carriage never exceeds physical endstop (2260 steps)
-    MAX_RAIL_STEPS = 2260
+    # Hardware rail protection: full travel rail limit across 35mm film holder track (4800 steps)
+    MAX_RAIL_STEPS = 4800
     if args.offset + args.lines * args.step > MAX_RAIL_STEPS:
         max_allowed_lines = (MAX_RAIL_STEPS - args.offset) // args.step
         print(f"[!] Warning: Requested scan ({args.offset} + {args.lines}*{args.step} = {args.offset + args.lines*args.step} steps) exceeds physical rail limit ({MAX_RAIL_STEPS})!")

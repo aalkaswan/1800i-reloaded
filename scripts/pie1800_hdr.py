@@ -58,7 +58,7 @@ EP_IN = 0x81
 FULL_LINE_BYTES = 16200  # 2,700 pixels * 3 channels * 2 bytes (uint16)
 PIXELS_PER_LINE = 2700
 WORDS_PER_LINE = 8100
-MAX_RAIL_STEPS = 2260
+MAX_RAIL_STEPS = 4800
 
 # Nominal exposure clock presets (at ~460 kHz CCD timing)
 # Hardware sampling gate (0x98..0x9b) supports clean linear integration across 2800..3800 clocks

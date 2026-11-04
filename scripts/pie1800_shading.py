@@ -45,7 +45,7 @@ EP_IN = 0x81
 FULL_LINE_BYTES = 16200  # 2,700 pixels * 3 channels * 2 bytes uint16
 PIXELS_PER_LINE = 2700
 WORDS_PER_LINE = 8100
-MAX_RAIL_STEPS = 2260
+MAX_RAIL_STEPS = 4800
 SAFE_DOCK_STEP_MAX = 200  # Calibration dock range: 0..200 (well before film aperture at 1250)
 MAGIC_HEADER = b"PF1800FF\x01\x00"
 

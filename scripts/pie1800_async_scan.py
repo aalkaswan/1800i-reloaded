@@ -53,7 +53,7 @@ EP_IN = 0x81
 
 FULL_LINE_BYTES = 16200  # 2700 pixels * 3 channels * 2 bytes (14-bit ADC in uint16)
 PIXELS_PER_LINE = 2700
-MAX_RAIL_STEPS = 2260    # Mechanical rail limit (1/1800 inch microsteps = ~31.9 mm)
+MAX_RAIL_STEPS = 4800    # Mechanical rail limit (1/1800 inch microsteps = ~67.7 mm)
 
 # ==============================================================================
 # Low-Level Hardware USB Helpers

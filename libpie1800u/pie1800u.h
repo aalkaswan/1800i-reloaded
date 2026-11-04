@@ -33,7 +33,7 @@ extern "C" {
 #define PIE1800_DIR_FORWARD      0x16  // Advance into scanner bay
 #define PIE1800_DIR_BACKWARD     0x14  // Retract toward home stop
 
-#define PIE1800_MAX_TRAVEL_STEPS 2260  // Verified physical rail limit (~31.9 mm travel from home stop)
+#define PIE1800_MAX_TRAVEL_STEPS 4800  // Full physical rail limit across 35mm film holder carriage (~67.7 mm travel)
 
 typedef struct {
     libusb_context *ctx;

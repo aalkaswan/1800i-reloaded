@@ -110,7 +110,7 @@ PRODUCT_ID = 0x0120
 
 PIXELS_PER_LINE = 2700
 FULL_LINE_BYTES = 16200  # 2700 pixels * 3 channels * 2 bytes uint16
-MAX_RAIL_STEPS = 2260    # Hard physical rail limit
+MAX_RAIL_STEPS = 4800    # Full mechanical carriage rail limit across film holder track
 DEFAULT_APERTURE_OFFSET = 1250
 DEFAULT_FRAME_LINES = 950
 DMA_PACKET_DESC = struct.pack("<BBBB I", 0x00, 0x00, 0x00, 0x00, FULL_LINE_BYTES)
@@ -374,15 +374,17 @@ class ScannerHardware:
             return self.current_position
 
         direction = 0x16 if target > self.current_position else 0x14
-        if self.is_connected:
+        if self.is_connected and self.dev:
             with self.lock:
                 rem = steps_to_move
+                self._asic_write(0x85, direction)
                 while rem > 0:
-                    chunk = min(rem, 250)
-                    self._asic_write(0x85, direction)
+                    chunk = min(rem, 200)
                     self._asic_write(0x81, chunk)
+                    self._asic_write(0x83, 0x01) # Trigger motor stepping pulse
                     self.wait_idle()
                     rem -= chunk
+                    time.sleep(0.002)
                 self.disarm_coils()
 
         self.current_position = target
@@ -396,13 +398,15 @@ class ScannerHardware:
             return self.current_position
         if self.is_connected and self.dev:
             with self.lock:
+                self._asic_write(0x85, 0x16)
                 rem = actual
                 while rem > 0:
-                    chunk = min(rem, 250)
-                    self._asic_write(0x85, 0x16)
+                    chunk = min(rem, 200)
                     self._asic_write(0x81, chunk)
+                    self._asic_write(0x83, 0x01) # Trigger motor stepping pulse
                     self.wait_idle()
                     rem -= chunk
+                    time.sleep(0.002)
         self.current_position = target
         return self.current_position
 
@@ -414,12 +418,14 @@ class ScannerHardware:
 
         with self.lock:
             # Retract backward toward optical sensor in 50-step increments
-            for _ in range(60):
-                if self.is_home():
-                    break
-                self._asic_write(0x85, 0x14)
+            total = 0
+            self._asic_write(0x85, 0x14)
+            while not self.is_home() and total < MAX_RAIL_STEPS + 500:
                 self._asic_write(0x81, 50)
+                self._asic_write(0x83, 0x01) # Trigger motor stepping pulse
                 self.wait_idle()
+                total += 50
+                time.sleep(0.002)
 
             self.disarm_coils()
             self.current_position = 0
@@ -967,24 +973,30 @@ if HAS_QT:
             center_l.addWidget(self.canvas, stretch=1)
 
             # Jog Rail
-            jog_grp = QGroupBox("Carriage Stepper Rail (0 - 2,260 Steps)")
+            jog_grp = QGroupBox("Carriage Stepper Rail (0 - 4,800 Steps)")
             jog_l = QHBoxLayout(jog_grp)
             self.lbl_pos = QLabel("Position: 1250 steps (~17.6 mm)")
+            btn_jb5 = QPushButton("<<< -500")
             btn_jb1 = QPushButton("<< -100")
             btn_jb2 = QPushButton("< -10")
             btn_jf1 = QPushButton("> +10")
             btn_jf2 = QPushButton(">> +100")
+            btn_jf5 = QPushButton(">>> +500")
             btn_home = QPushButton("Home Dock (0)")
+            btn_jb5.clicked.connect(lambda: self._jog(-500))
             btn_jb1.clicked.connect(lambda: self._jog(-100))
             btn_jb2.clicked.connect(lambda: self._jog(-10))
             btn_jf1.clicked.connect(lambda: self._jog(10))
             btn_jf2.clicked.connect(lambda: self._jog(100))
+            btn_jf5.clicked.connect(lambda: self._jog(500))
             btn_home.clicked.connect(self._home)
             jog_l.addWidget(self.lbl_pos)
+            jog_l.addWidget(btn_jb5)
             jog_l.addWidget(btn_jb1)
             jog_l.addWidget(btn_jb2)
             jog_l.addWidget(btn_jf1)
             jog_l.addWidget(btn_jf2)
+            jog_l.addWidget(btn_jf5)
             jog_l.addWidget(btn_home)
             center_l.addWidget(jog_grp)
 
@@ -1199,11 +1211,13 @@ if HAS_QT:
         def _on_worker_progress(self, current: int, total: int, rate: float):
             pct = int((current / total) * 100)
             eta = (total - current) / max(rate, 0.01)
-            QTimer.singleShot(0, lambda: self._update_pbar(pct, current, total, rate, eta))
+            pos = self.hardware.current_position
+            QTimer.singleShot(0, lambda: self._update_pbar(pct, current, total, rate, eta, pos))
 
-        def _update_pbar(self, pct: int, current: int, total: int, rate: float, eta: float):
+        def _update_pbar(self, pct: int, current: int, total: int, rate: float, eta: float, pos: int):
             self.pbar.setValue(pct)
-            self.statusBar().showMessage(f"Scanning Line {current}/{total} ({rate:.1f} lines/s) | ETA: {eta:.1f}s")
+            self.lbl_pos.setText(f"Position: {pos} steps (~{pos * 25.4 / 1800:.1f} mm)")
+            self.statusBar().showMessage(f"Scanning Line {current}/{total} ({rate:.1f} lines/s) | Rail Pos: {pos} steps | ETA: {eta:.1f}s")
 
         def _abort_scan(self):
             if self.active_worker:
@@ -1313,10 +1327,10 @@ WEB_STUDIO_HTML = """<!DOCTYPE html>
     </div>
     <div class="group">
       <h3>Carriage & Aperture</h3>
-      <label>Offset Microsteps (0 - 2,260):</label>
-      <input type="number" id="offset" value="1250" min="0" max="2260">
+      <label>Offset Microsteps (0 - 4,800):</label>
+      <input type="number" id="offset" value="1250" min="0" max="4800">
       <label>Lines to Scan:</label>
-      <input type="number" id="lines" value="950" min="10" max="1200">
+      <input type="number" id="lines" value="950" min="10" max="2500">
       <label>Temporal Multi-Sampling:</label>
       <input type="number" id="samples" value="4" min="1" max="16">
     </div>
@@ -1324,10 +1338,10 @@ WEB_STUDIO_HTML = """<!DOCTYPE html>
       <h3>Carriage Jog Rail</h3>
       <div style="font-size:12px; color:#aaa; margin-bottom:5px;" id="pos-readout">Position: 1250 steps (~17.6 mm)</div>
       <div class="jog-bar">
+        <button onclick="jog(-500)">&lt;&lt;&lt; -500</button>
         <button onclick="jog(-100)">&lt;&lt; -100</button>
-        <button onclick="jog(-10)">&lt; -10</button>
-        <button onclick="jog(10)">&gt; +10</button>
         <button onclick="jog(100)">&gt;&gt; +100</button>
+        <button onclick="jog(500)">&gt;&gt;&gt; +500</button>
       </div>
       <button onclick="home()" style="background:#444; margin-top:6px;">Auto Home Dock (0)</button>
     </div>
