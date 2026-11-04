@@ -388,19 +388,37 @@ class ScannerHardware:
         self.current_position = target
         return self.current_position
 
+    def step_forward(self, steps: int) -> int:
+        """Advances carriage during active scanning without dropping motor holding torque."""
+        target = min(self.current_position + steps, MAX_RAIL_STEPS)
+        actual = target - self.current_position
+        if actual <= 0:
+            return self.current_position
+        if self.is_connected and self.dev:
+            with self.lock:
+                rem = actual
+                while rem > 0:
+                    chunk = min(rem, 250)
+                    self._asic_write(0x85, 0x16)
+                    self._asic_write(0x81, chunk)
+                    self.wait_idle()
+                    rem -= chunk
+        self.current_position = target
+        return self.current_position
+
     def home(self) -> bool:
         """Returns carriage to optical dock (Step 0) using closed-loop sensor."""
-        if not self.is_connected:
+        if not self.is_connected or not self.dev:
             self.current_position = 0
             return True
 
         with self.lock:
-            # Retract backward toward optical sensor
-            for _ in range(30):
+            # Retract backward toward optical sensor in 50-step increments
+            for _ in range(60):
                 if self.is_home():
                     break
                 self._asic_write(0x85, 0x14)
-                self._asic_write(0x81, 100)
+                self._asic_write(0x81, 50)
                 self.wait_idle()
 
             self.disarm_coils()
@@ -410,19 +428,36 @@ class ScannerHardware:
     def read_line(self) -> Optional[bytes]:
         """
         Triggers CCD exposure and acquires a single 16,200-byte raw optical scanline
-        over USB Bulk IN Endpoint 1 (0x81).
+        over USB Bulk IN Endpoint 1 (0x81), resetting internal SRAM pointers and arming DMA.
         """
-        if not self.is_connected:
+        if not self.is_connected or not self.dev:
             return None
 
         with self.lock:
-            # Write DMA transfer descriptor to register 0x82
-            self._wctl(0x82, DMA_PACKET_DESC)
-            # Trigger line exposure integration (0x12)
-            self._asic_write(0x85, 0x12)
-            # Bulk read 16,200 bytes
-            data = self.dev.read(0x81, FULL_LINE_BYTES, timeout=3000)
-            return bytes(data) if len(data) == FULL_LINE_BYTES else None
+            try:
+                # 1. Trigger optical exposure
+                self._asic_write(0x85, 0x12)
+                self._asic_write(0x81, 0x00)
+                self.wait_idle()
+
+                # 2. Reset window end & SRAM read pointers
+                for r in (0x90, 0x91, 0x92, 0x93, 0x94, 0x95):
+                    self._asic_write(r, 0x00)
+                self.wait_idle()
+
+                # 3. Arm GL640 USB DMA engine
+                self._wctl(0x83, 0x80)
+                self._wctl(0x82, DMA_PACKET_DESC)
+
+                # 4. Read bulk scanline from EP 0x81
+                raw = self.dev.read(0x81, FULL_LINE_BYTES, timeout=4000)
+                self.wait_idle(timeout=1.0)
+                if raw and len(raw) == FULL_LINE_BYTES:
+                    return bytes(raw)
+                return None
+            except Exception as e:
+                print(f"[!] USB read_line error: {e}")
+                return None
 
 
 # Register process exit handler to always guarantee coil disarming
@@ -481,6 +516,44 @@ class ColorGradingEngine:
                 lut[c][v] = max(0, min(255, val_out))
 
         return lut
+
+    @staticmethod
+    def deplanarize(raw_bytes: bytes) -> List[int]:
+        """
+        Unpacks 16,200 planar bytes from scanner CCD (2700 uint16 R, 2700 uint16 G, 2700 uint16 B)
+        into 8,100 interleaved uint16 words: [R0, G0, B0, R1, G1, B1, ...].
+        """
+        words = struct.unpack(f"<{FULL_LINE_BYTES // 2}H", raw_bytes)
+        out = [0] * (PIXELS_PER_LINE * 3)
+        r_off = 0
+        g_off = PIXELS_PER_LINE
+        b_off = PIXELS_PER_LINE * 2
+        for x in range(PIXELS_PER_LINE):
+            idx = x * 3
+            out[idx]     = words[r_off + x]
+            out[idx + 1] = words[g_off + x]
+            out[idx + 2] = words[b_off + x]
+        return out
+
+    @staticmethod
+    def apply_lut_to_line(interleaved_words: List[int], lut: List[List[int]]) -> bytearray:
+        """
+        Applies 3x16384 LUT to a single line of interleaved words (8100 words),
+        producing an 8-bit RGB bytearray (2700 * 3 bytes).
+        """
+        n = len(interleaved_words)
+        out = bytearray(n)
+        lut_r = lut[0]
+        lut_g = lut[1]
+        lut_b = lut[2]
+        for i in range(0, n - 2, 3):
+            wr = interleaved_words[i] >> 2
+            wg = interleaved_words[i + 1] >> 2
+            wb = interleaved_words[i + 2] >> 2
+            out[i]     = lut_r[wr if wr < 16384 else 16383]
+            out[i + 1] = lut_g[wg if wg < 16384 else 16383]
+            out[i + 2] = lut_b[wb if wb < 16384 else 16383]
+        return out
 
     @staticmethod
     def apply_lut_to_raw_words(raw_words_interleaved: List[int], lut: List[List[int]]) -> bytearray:
@@ -563,50 +636,65 @@ class ScanSessionWorker:
         t0 = time.time()
         print(f"[*] Acquisition Started: Offset {self.offset}, {self.lines} lines, step {self.step_inc}x")
 
-        # 1. Move to aperture offset
-        if self.hardware.is_connected:
-            self.hardware.set_lamp(True)
-            self.hardware.jog(self.offset - self.hardware.current_position)
-            if self.analog_balance:
-                self.hardware.set_exposure(2900, 2900, int(2900 * 1.35))
-            else:
-                self.hardware.set_exposure(2900, 2900, 2900)
-        else:
-            self.hardware.current_position = self.offset
-
-        # 2. Acquisition loop
-        for line_idx in range(self.lines):
-            if self.is_aborted:
-                print("[!] Scan aborted by user! Enforcing coil disarm (0x85 -> 0x10)...")
-                self.hardware.disarm_coils()
-                on_complete(False, "Scan aborted. Stepper coils safely disarmed.")
-                return
-
-            raw_words = []
+        try:
+            # 1. Optical Homing & Aperture Positioning
             if self.hardware.is_connected:
-                raw_bytes = self.hardware.read_line()
-                if raw_bytes and len(raw_bytes) == FULL_LINE_BYTES:
-                    # Unpack 8,100 little-endian uint16 samples
-                    raw_words = list(struct.unpack(f"<{PIXELS_PER_LINE * 3}H", raw_bytes))
+                # If docked or starting, check home sensor to guarantee carriage tracking
+                if self.hardware.current_position == 0 and not self.hardware.is_home():
+                    print("[*] Optical carriage docked: Verifying closed-loop home...")
+                    self.hardware.home()
+
+                self.hardware.set_lamp(True)
+                delta = self.offset - self.hardware.current_position
+                if delta != 0:
+                    self.hardware.jog(delta)
+
+                if self.analog_balance:
+                    self.hardware.set_exposure(2900, 2900, int(2900 * 1.35))
                 else:
-                    raw_words = self._generate_synthetic_line(line_idx)
+                    self.hardware.set_exposure(2900, 2900, 2900)
             else:
-                # High-fidelity mock simulation line
-                time.sleep(0.085 * self.samples) # Simulate 11.7 lines/s
-                raw_words = self._generate_synthetic_line(line_idx)
+                self.hardware.current_position = self.offset
 
-            # Advance motor to next scanline
-            if self.step_inc > 0 and self.hardware.is_connected:
-                self.hardware.jog(self.step_inc)
+            # 2. Continuous Acquisition Loop
+            for line_idx in range(self.lines):
+                if self.is_aborted:
+                    print("[!] Scan aborted by user! Enforcing coil disarm...")
+                    break
 
-            elapsed = max(time.time() - t0, 0.001)
-            rate = (line_idx + 1) / elapsed
-            on_line(line_idx, raw_words)
-            on_progress(line_idx + 1, self.lines, rate)
+                raw_words = []
+                if self.hardware.is_connected:
+                    raw_bytes = self.hardware.read_line()
+                    if raw_bytes and len(raw_bytes) == FULL_LINE_BYTES:
+                        # Deplanarize 2700 R, 2700 G, 2700 B into interleaved RGB
+                        raw_words = ColorGradingEngine.deplanarize(raw_bytes)
+                    else:
+                        print(f"[!] Warning: Line {line_idx} read timeout. Using fallback.")
+                        raw_words = self._generate_synthetic_line(line_idx)
+                else:
+                    # High-fidelity mock simulation line
+                    time.sleep(0.085 * self.samples) # Simulate 11.7 lines/s
+                    raw_words = self._generate_synthetic_line(line_idx)
 
-        self.hardware.disarm_coils()
-        print("[+] Scan completed successfully.")
-        on_complete(True, f"Scan completed successfully ({self.lines} lines).")
+                elapsed = max(time.time() - t0, 0.001)
+                rate = (line_idx + 1) / elapsed
+                on_line(line_idx, raw_words)
+                on_progress(line_idx + 1, self.lines, rate)
+
+                # Advance motor to next line (continuous stepping without dropping coil torque)
+                if line_idx < self.lines - 1 and self.step_inc > 0 and self.hardware.is_connected:
+                    self.hardware.step_forward(self.step_inc)
+
+            if self.is_aborted:
+                on_complete(False, "Scan aborted by user. Stepper coils safely disarmed.")
+            else:
+                print("[+] Scan completed successfully.")
+                on_complete(True, f"Scan completed successfully ({self.lines} lines).")
+        except Exception as e:
+            print(f"[!] Scan error: {e}")
+            on_complete(False, f"Scan stopped: {e}")
+        finally:
+            self.hardware.disarm_coils()
 
     def _generate_synthetic_line(self, line_idx: int) -> List[int]:
         """Generates realistic synthetic 14-bit optical words with orange negative film characteristics."""
@@ -1036,30 +1124,33 @@ if HAS_QT:
             if n_words > len(self.raw_frame_words): return
 
             words_subset = self.raw_frame_words[:n_words]
-            graded_line_bytes = ColorGradingEngine.apply_lut_to_raw_words(words_subset, self.lut)
+            self.graded_frame_bytes[:n_words] = ColorGradingEngine.apply_lut_to_raw_words(words_subset, self.lut)
+            self._update_viewport_display(active_line)
 
-            # 2x vertical expansion for square 1800 DPI pixels
+        def _update_viewport_display(self, active_line: int = -1):
+            """Refreshes the canvas viewport and histogram from graded_frame_bytes."""
             line_bytes_len = PIXELS_PER_LINE * 3
             scaled_h = self.current_lines * 2
             scaled_bytes = bytearray(scaled_h * line_bytes_len)
 
             for y in range(self.current_lines):
                 src_start = y * line_bytes_len
-                src_end = src_start + line_bytes_len
-                line_data = graded_line_bytes[src_start:src_end]
-                dst_start1 = (y * 2) * line_bytes_len
-                dst_start2 = (y * 2 + 1) * line_bytes_len
-                scaled_bytes[dst_start1 : dst_start1 + line_bytes_len] = line_data
-                scaled_bytes[dst_start2 : dst_start2 + line_bytes_len] = line_data
+                line_data = self.graded_frame_bytes[src_start : src_start + line_bytes_len]
+                dst1 = (y * 2) * line_bytes_len
+                dst2 = (y * 2 + 1) * line_bytes_len
+                scaled_bytes[dst1 : dst1 + line_bytes_len] = line_data
+                scaled_bytes[dst2 : dst2 + line_bytes_len] = line_data
 
-            qimg = QImage(bytes(scaled_bytes), PIXELS_PER_LINE, scaled_h, line_bytes_len, QImage.Format_RGB888)
+            self._cached_bytes = bytes(scaled_bytes)
+            qimg = QImage(self._cached_bytes, PIXELS_PER_LINE, scaled_h, line_bytes_len, QImage.Format_RGB888).copy()
             self.canvas.set_frame_image(qimg, active_line * 2 if active_line >= 0 else -1, scaled_h)
 
-            hr, hg, hb = ColorGradingEngine.calculate_histogram(graded_line_bytes, stride=18)
+            hr, hg, hb = ColorGradingEngine.calculate_histogram(self.graded_frame_bytes[:self.current_lines * line_bytes_len], stride=24)
             self.hist_widget.set_histograms(hr, hg, hb)
 
         def _start_preview(self):
-            self._begin_scan(offset=DEFAULT_APERTURE_OFFSET, lines=240, step=4, samples=1)
+            # 240 lines with step 2 (480 steps = ~10.2mm travel, well within 2,260 rail limit)
+            self._begin_scan(offset=DEFAULT_APERTURE_OFFSET, lines=240, step=2, samples=1)
 
         def _start_scan(self):
             offset = self.sb_offset.value()
@@ -1070,6 +1161,7 @@ if HAS_QT:
         def _begin_scan(self, offset: int, lines: int, step: int, samples: int):
             self.current_lines = lines
             self.raw_frame_words = [0] * (lines * PIXELS_PER_LINE * 3)
+            self.graded_frame_bytes = bytearray(lines * PIXELS_PER_LINE * 3)
             self.is_scanning = True
             self.btn_preview.setEnabled(False)
             self.btn_scan.setEnabled(False)
@@ -1092,10 +1184,17 @@ if HAS_QT:
         def _on_worker_line(self, line_idx: int, words: List[int]):
             start = line_idx * PIXELS_PER_LINE * 3
             end = start + len(words)
-            self.raw_frame_words[start:end] = words
-            if line_idx % 4 == 0 or line_idx == self.current_lines - 1:
-                # Trigger thread-safe GUI render
-                QTimer.singleShot(0, lambda: self._render_graded_frame(active_line=line_idx))
+            if end <= len(self.raw_frame_words):
+                self.raw_frame_words[start:end] = words
+
+            # Grade this single line immediately into graded_frame_bytes
+            line_rgb = ColorGradingEngine.apply_lut_to_line(words, self.lut)
+            if end <= len(self.graded_frame_bytes):
+                self.graded_frame_bytes[start:end] = line_rgb
+
+            # Progressively stream to canvas viewport
+            if line_idx % 2 == 0 or line_idx == self.current_lines - 1:
+                QTimer.singleShot(0, lambda l=line_idx: self._update_viewport_display(l))
 
         def _on_worker_progress(self, current: int, total: int, rate: float):
             pct = int((current / total) * 100)
@@ -1109,18 +1208,21 @@ if HAS_QT:
         def _abort_scan(self):
             if self.active_worker:
                 self.active_worker.abort()
-                self.btn_abort.setEnabled(False)
-                self.statusBar().showMessage("Aborting scan... Writing 0x85 -> 0x10 to disarm coils...")
+            self.hardware.disarm_coils()
+            self.btn_abort.setEnabled(False)
+            self.statusBar().showMessage("Aborting scan... Writing 0x85 -> 0x10 to disarm coils...")
+            QTimer.singleShot(500, lambda: self._finish_ui(False, "Scan aborted by user."))
 
         def _on_worker_complete(self, success: bool, msg: str):
             self.is_scanning = False
             QTimer.singleShot(0, lambda: self._finish_ui(success, msg))
 
         def _finish_ui(self, success: bool, msg: str):
+            self.is_scanning = False
             self.btn_preview.setEnabled(True)
             self.btn_scan.setEnabled(True)
             self.btn_abort.setEnabled(False)
-            self._render_graded_frame(active_line=-1)
+            self._update_viewport_display(active_line=-1)
             self.statusBar().showMessage(msg)
 
         def _export_image(self):
