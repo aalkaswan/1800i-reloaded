@@ -28,14 +28,28 @@ pnputil /add-driver windows_driver\pie1800u_winusb.inf /install
 
 ## 2. Running PrimeFilm Studio UI
 
-### Option A: Quick Zero-Dependency Web Studio (Runs out of the box!)
-No extra Qt dependencies needed. Works with standard Python 3.9+:
-1. Double-click `run_studio.bat` (or open Command Prompt and run `python scripts\primefilm_studio_app.py`).
-2. If PySide6 is not installed, the app automatically boots the **Desktop Web Studio** on `http://127.0.0.1:8080` and pops open your default web browser (Edge/Chrome/Firefox).
-3. The interface features live scanline streaming, 8-handle crop box, 60 FPS real-time negative color inversion, RGB histograms, and hardware carriage controls.
+### Option A: Standalone `PrimeFilmStudio.exe` (Zero Requirements / No Python Needed!)
+If you downloaded the compiled **`PrimeFilmStudio.exe`** from the GitHub Releases:
+1. Double-click **`PrimeFilmStudio.exe`**.
+2. **No Python, pip, or command-line setup is needed.** The executable bundles the entire runtime, GUI, and USB backend into a single self-contained binary.
 
-### Option B: Native Qt Studio Desktop Window (PySide6)
-For a standalone native desktop window:
+To build `PrimeFilmStudio.exe` yourself on Windows:
+```cmd
+build_windows_exe.bat
+```
+*(The binary will be generated in `dist\PrimeFilmStudio.exe`)*.
+
+---
+
+### Option B: Quick Zero-Dependency Web Studio (Standard Python)
+Runs using stock Python 3.9+ with no external pip packages:
+1. Double-click `run_studio.bat` (or run `python scripts\primefilm_studio_app.py`).
+2. If PySide6 is not installed, the app automatically boots the **Desktop Web Studio** on `http://127.0.0.1:8080` and pops open your default web browser (Edge/Chrome/Firefox).
+
+---
+
+### Option C: Native Qt Studio Desktop Window (PySide6)
+For a standalone native desktop window from source:
 ```cmd
 pip install PySide6 pyusb libusb-package pillow
 python scripts\primefilm_studio_app.py

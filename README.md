@@ -144,13 +144,13 @@ python3 scripts/primefilm_studio_app.py --mock
 ```
 
 #### Launching on Windows 10 / 11:
-1. Double-click `run_studio.bat` (or run `python scripts\primefilm_studio_app.py`).
-2. If PySide6 is not installed, it automatically launches the zero-dependency Web Studio in your browser without requiring extra packages.
-3. For the native Qt standalone window:
-   ```cmd
-   pip install PySide6 pyusb libusb-package pillow
-   run_studio.bat
-   ```
+* **Standalone `.EXE` (Zero Requirements / No Python needed)**: Download `PrimeFilmStudio.exe` from GitHub Releases and double-click to run. To compile it locally on Windows, execute `build_windows_exe.bat`.
+* **Standard Python**: Double-click `run_studio.bat` (or run `python scripts\primefilm_studio_app.py`). It automatically boots the zero-dependency Web Studio interface in your browser.
+* **Native Qt Window**:
+  ```cmd
+  pip install PySide6 pyusb libusb-package pillow
+  run_studio.bat
+  ```
 
 ---
 

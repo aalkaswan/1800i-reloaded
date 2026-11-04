@@ -1,0 +1,44 @@
+name: Build Standalone Windows Executable
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller pyusb libusb-package pillow PySide6
+
+      - name: Build Standalone PrimeFilmStudio.exe
+        run: |
+          pyinstaller --clean PrimeFilmStudio.spec
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimeFilmStudio-Windows-x64
+          path: dist/PrimeFilmStudio.exe
+
+      - name: Release Asset (on Tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/PrimeFilmStudio.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
