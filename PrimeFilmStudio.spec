@@ -4,9 +4,12 @@
 # with zero external dependencies (no Python or pip installation required).
 
 import sys
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
 block_cipher = None
+
+datas = []
+binaries = []
 
 hidden_imports = [
     'usb.core',
@@ -29,20 +32,19 @@ try:
 except ImportError:
     pass
 
-# Collect libusb_package if available
+# Collect libusb_package (and its libusb-1.0.dll) if available
 try:
     import libusb_package
     hidden_imports += collect_submodules('libusb_package')
     datas += collect_data_files('libusb_package')
-except ImportError:
+    binaries += collect_dynamic_libs('libusb_package')
+except (ImportError, Exception):
     pass
-
-datas = []
 
 a = Analysis(
     ['scripts/primefilm_studio_app.py'],
     pathex=['.'],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hidden_imports,
     hookspath=[],
@@ -68,10 +70,10 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False, # Avoid upx issues with antivirus false positives
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False, # Set to False for native clean windowed app (no command prompt)
+    console=False, # Set to False for native clean windowed app
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
